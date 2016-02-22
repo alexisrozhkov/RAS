@@ -9,7 +9,7 @@ typedef std::vector<CellArray> CellArray2D;
 
 CellArray balls_and_bins(const unsigned int ballCount,
                          const unsigned int binCount,
-                         bool all) {
+                         const bool all) {
   // Create a two dimensional cell array to hold solutions for smaller values of both ballCount and binCount.
   CellArray2D outputCellArray2D;
   for(int j = 0; j < ballCount; j++) {
@@ -26,43 +26,33 @@ CellArray balls_and_bins(const unsigned int ballCount,
     outputCellArray2D[row][0] = Cell::ones(1, 1)*(row+1);
   }
 
-  // Apply method of computing that exploits a pattern that becomes noticable when the
+  // Apply method of computing that exploits a pattern that becomes noticeable when the
   // arrangements are written out in increasing order.  The base cases for one ball and for
   // one bin are trivial, and the rest of the cases can be formed by induction in two directions.
   for(int row = 1; row < ballCount; row++) {
     for(int column = 1; column < binCount; column++) {
-      const Cell& temp1 = outputCellArray2D[row - 1][column];
+      // Increment the first column of the case for one less ball.
+      Cell upper = outputCellArray2D[row - 1][column].clone();
+      upper.colRange(0, 1) += Cell::ones(upper.rows, 1);
+
+      // Prepend a column of zeros to the case for one less bin.
+      Cell lower;
       const Cell& temp2 = outputCellArray2D[row][column - 1];
-      Cell& curr = outputCellArray2D[row][column];
+      cv::hconcat(Cell::zeros(temp2.rows, 1), temp2, lower);
 
-      curr = Cell::zeros(temp1.rows + temp2.rows, temp1.cols);
-
-      for (int j = 0; j < temp1.rows; j++) {
-        curr(j, 0) = temp1(j, 0) + 1;
-      }
-
-      for (int i = 1; i < temp1.cols; i++) {
-        for (int j = 0; j < temp1.rows; j++) {
-          curr(j, i) = temp1(j, i);
-        }
-
-        for (int j = 0; j < temp2.rows; j++) {
-          curr(temp1.rows + j, i) = temp2(j, i - 1);
-        }
-      }
+      // The case for one more bin is just the vertical concatenation.
+      cv::vconcat(upper, lower, outputCellArray2D[row][column]);
     }
   }
 
   CellArray outputCellArray;
 
   if(!all) {
-    // (converting) return last cell
-    outputCellArray.push_back(outputCellArray2D[ballCount-1][binCount-1]);
+    outputCellArray.push_back(outputCellArray2D.back().back());
   }
 
   else {
-    // (converting) return last column
-    for(int i = 0; i < ballCount; i++) outputCellArray.push_back(outputCellArray2D[i][binCount-1]);
+    for(int i = 0; i < ballCount; i++) outputCellArray.push_back(outputCellArray2D[i].back());
   }
 
   return outputCellArray;
