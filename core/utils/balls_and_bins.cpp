@@ -1,3 +1,7 @@
+//
+// Created by alexey on 21.02.16.
+//
+
 #include <vector>
 #include "balls_and_bins.h"
 

@@ -5,6 +5,7 @@
 #ifndef RAS_BALLS_AND_BINS_H
 #define RAS_BALLS_AND_BINS_H
 
+#include <vector>
 #include <opencv2/core.hpp>
 
 // Enumerates all possible groupings of identical objects, i.e. balls in bins.
