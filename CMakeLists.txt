@@ -3,6 +3,7 @@ project(runRAS)
 
 add_definitions(-std=c++11)
 
+include_directories(core/utils)
 set(SOURCE_FILES main.cpp)
 
 add_subdirectory(core)
