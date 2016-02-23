@@ -44,7 +44,7 @@ std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const Mat2D
 
   Mat2DArray V(2*order);
   Mat3DArray D(2*order);
-  Mat4DArray H(2*order); //if nargout >=3,
+  Mat4DArray H(2*order);
 
   for(int o = 0; o < 2*order; o++) {
     int dims = indices[o].rows;
@@ -56,6 +56,19 @@ std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const Mat2D
 
     for(int d = 0; d < dims; d++) {
       D[o][d] = Mat2D::zeros(K, N);
+    }
+
+    // (converting) init H
+    if(nargout >= 3) {
+      H[o] = Mat3DArray(uint(dims));
+
+      for(int d = 0; d < dims; d++) {
+        H[o][d] = Mat2DArray(K);
+
+        for(int k = 0; k < K; k++) {
+          H[o][d][k] = Mat2D::zeros(K, N);
+        }
+      }
     }
   }
 
@@ -113,20 +126,7 @@ std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const Mat2D
       for(int d = 0; d < K; d++) {
         D[o][d].row(d) = Mat2D::ones(1, N);
       }
-
-      if(nargout >= 3) {
-        //todo
-        /*
-        for(int t = 0; t < K; t++) {
-          for(int d = 0; d < K; d++) {
-            cv::Mat temp = cv::Mat::zeros(K, N, CV_64F);
-            H[o][t].push_back(temp);
-          }
-        }
-         */
-      }
     }
-
     else {
       int Mn = indices[o].rows;
 
@@ -149,6 +149,33 @@ std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const Mat2D
         for(int j = 0; j < Vd.rows; j++) {
           D[o][j].row(d) = D_indices(j)*Vd.row(j);
         }
+
+        if(nargout >= 3) {
+          for(int h = d; h < K; h++) {
+            auto H_indices = indices[o].col(h);
+            Mat2D Vh = Mat2D::zeros(Mn, N);
+
+            int nz2 = 0;
+            for(int j = 0; j < H_indices.rows; j++) {
+              if(H_indices(j) != 0) {
+                D[o-1][nz2].row(d).copyTo(Vh.row(j));
+                nz2++;
+              }
+            }
+
+            for(int j = 0; j < Vh.rows; j++) {
+              H[o][j][d].row(h) = H_indices(j)*Vh.row(j);
+            }
+
+            if(d != h) {
+              for(int j = 0; j < H[o].size(); j++) {
+                for(int i = 0; i < N; i++) {
+                  H[o][j][h](d, i) = H[o][j][d](h, i);
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -160,29 +187,24 @@ std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const Mat2D
   else {
     auto Vlast = V.back();
     auto Dlast = D.back();
-    //auto Hlast = H.back();
+    auto Hlast = H.back();
 
     Mat2D V_keep = Mat2D::zeros(numKeepDimensions, Vlast.cols);
-    Mat3D D_keep((unsigned int)numKeepDimensions);//todo: check difference between uint and unsigned int
+    Mat3D D_keep((uint)numKeepDimensions);  // todo: check difference between uint() and (uint) casts
+    Mat4D H_keep((uint)numKeepDimensions);
 
     int tn = 0;
     for(int j = 0; j < keepDimensions.rows; j++) {
       if(keepDimensions(j)) {
         Vlast.row(j).copyTo(V_keep.row(tn));
         D_keep[tn] = Dlast[j];
+        H_keep[tn] = Hlast[j];
         tn++;
       }
     }
-    Mat2DArray Vvec;
-    Mat3DArray Dvec;
-    Mat4DArray Hvec;
 
-    Vvec.push_back(V_keep);
-    Dvec.push_back(D_keep);
-
-    //todo
-    //Hvec.push_back(H_keep);
-
-    return std::make_tuple(Vvec, Dvec, Hvec);
+    return std::make_tuple(Mat2DArray{V_keep},
+                           Mat3DArray{D_keep},
+                           Mat4DArray{H_keep});
   }
 }
