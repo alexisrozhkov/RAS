@@ -6,9 +6,6 @@
 #include "perspective_embedding.h"
 #include "utils/balls_and_bins.h"
 
-typedef cv::Mat1i Cell;
-typedef std::vector<Cell> CellArray;
-typedef std::vector<CellArray> CellArray2D;
 
 inline bool all_1i(const cv::Mat& mat) {
   for(int j = 0; j < mat.rows; j++) {
@@ -20,12 +17,10 @@ inline bool all_1i(const cv::Mat& mat) {
   return 1;
 }
 
-std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const cv::Mat &data,
+std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const Mat2D &data,
                                                                      const unsigned int order,
                                                                      const bool all,
                                                                      const int nargout) {
-  const int debug = 0;
-
   unsigned int K = uint(data.rows),
                N = uint(data.cols);
 
@@ -35,129 +30,126 @@ std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const cv::M
   // are zero. So we drop all dimensions in the veronese maps whose exponents
   // are larger than order/2.
   auto lastIndices = indices.back();
-  if(debug) {
-    std::cout << "lastIndices =\n" << lastIndices << std::endl;
-  }
-
-  int numDimensions = lastIndices.size().height;
+  int numDimensions = lastIndices.rows;
   cv::Mat1i keepDimensions(numDimensions, 1);
+
+  int numKeepDimensions = 0;
   for(int k = 0; k < numDimensions; k++) {
     keepDimensions(k) =
         ((lastIndices(k, 0) + lastIndices(k, 1)) <= order) &&
         ((lastIndices(k, 2) + lastIndices(k, 3)) <= order);
-  }
 
-  if(debug) {
-    std::cout << "keep =\n" << keepDimensions << std::endl;
+    numKeepDimensions += keepDimensions(k);
   }
 
   Mat2DArray V(2*order);
   Mat3DArray D(2*order);
   Mat4DArray H(2*order); //if nargout >=3,
 
+  for(int o = 0; o < 2*order; o++) {
+    int dims = indices[o].rows;
+    // (converting) init V
+    V[o] = Mat2D::zeros(dims, N);
+
+    // (converting) init D
+    D[o] = Mat2DArray(uint(dims));
+
+    for(int d = 0; d < dims; d++) {
+      D[o][d] = Mat2D::zeros(K, N);
+    }
+  }
+
   // One column indicates whether there are 0 elements in this data vector.
   cv::Mat1i zeroData = cv::Mat1i::zeros(data.cols, 1);
   cv::Mat1i nonzeroData = cv::Mat1i::zeros(data.cols, 1);
-  int zeroFlag = 0;
-
 
   for(int i = 0; i < data.cols; i++) {
     for(int j = 0; j < data.rows; j++) {
-      zeroData(i) += data.at<double>(j, i) == 0;
+      zeroData(i) += data(j, i) == 0;
     }
-    zeroFlag += zeroData(i);
 
     if(!zeroData(i)) nonzeroData(i) = 1;
   }
 
-  if(debug) {
-    std::cout << "zeroData =\n" << zeroData << std::endl;
-    std::cout << "nonzeroData =\n" << nonzeroData << std::endl;
-    std::cout << "zeroFlag =\n" << zeroFlag << std::endl;
-  }
-
-  cv::Mat logData = cv::Mat::zeros(K, N, CV_64F);
+  Mat2D logData = Mat2D::zeros(K, N);
   cv::log(data, logData);
 
-  std::vector<cv::Mat> indicesFlt;
+  Mat2DArray indicesFlt(indices.size());
   for(int i = 0; i < indices.size(); i++) {
-    cv::Mat temp;
-    indices[i].convertTo(temp, CV_64F);
-    indicesFlt.push_back(temp);
+    indices[i].convertTo(indicesFlt[i], CV_64F);
   }
 
   for(int o = 0; o < 2*order; o++) {
     // Trick to compute the Veronese map using matrix multiplication
     if(all_1i(nonzeroData)) {
       // No exact 0 element in the data, log(Data) is finite, with possible complex terms when the data value is negative
-      cv::exp(indicesFlt[o] * logData, V[o]); // (converting) conversion to real dropped
-
-      if(debug) {
-        std::cout << "all nonzero" << std::endl;
-        std::cout << V[o].size() << std::endl;
-      }
+      Mat2D temp = indicesFlt[o] * logData;
+      cv::exp(temp, V[o]); // (converting) conversion to real dropped
     }
 
     else {
       int rows = indicesFlt[o].rows;
-      V[o] = cv::Mat(indicesFlt[o].rows, N, CV_64F);
 
       for(int dataPoint = 0; dataPoint < N; dataPoint++) {
         if(zeroData(dataPoint) > 0) {
           // data(dataPoint) has 0 elements that are left unprocessed above.
-          for(int rowCount=0; rowCount < rows; rowCount++) {
-            double prod = 1;
+          for(int rowCount = 0; rowCount < rows; rowCount++) {
+            V[o](rowCount, dataPoint) = 1;
             for(int i = 0; i < data.rows; i++) {
-              prod *= std::pow(data.at<double>(i, dataPoint), indicesFlt[o].at<double>(rowCount, i));
+              V[o](rowCount, dataPoint) *= std::pow(data(i, dataPoint), indicesFlt[o](rowCount, i));
             }
-
-            V[o].at<double>(rowCount, dataPoint) = prod;
-          }
-
-          if(debug) {
-            std::cout << "this zero" << std::endl;
-            std::cout << "indicesFlt =\n" << indicesFlt[o] << std::endl;
-            std::cout << "logData =\n" << logData.col(dataPoint) << std::endl;
-            std::cout << "V =\n" << V[o].col(dataPoint) << std::endl;
           }
         }
 
         else {
           // (converting) conversion to real dropped
-          cv::exp(indicesFlt[o] * logData.col(dataPoint), V[o].col(dataPoint));
-
-          if(debug) {
-            std::cout << "this nonzero" << std::endl;
-            std::cout << "indicesFlt =\n" << indicesFlt[o] << std::endl;
-            std::cout << "logData =\n" << logData.col(dataPoint) << std::endl;
-            std::cout << "V =\n" << V[o].col(dataPoint) << std::endl;
-          }
+          Mat2D temp = indicesFlt[o] * logData.col(dataPoint);
+          cv::exp(temp, V[o].col(dataPoint));
         }
       }
     }
 
     if(o == 0) {
       for(int d = 0; d < K; d++) {
-        cv::Mat temp = cv::Mat::zeros(K, N, CV_64F);
-        D[o].push_back(temp);
-      }
-
-      for(int d = 0; d < K; d++) {
-        D[o][d].row(d) = cv::Mat::ones(1, N, CV_64F);
+        D[o][d].row(d) = Mat2D::ones(1, N);
       }
 
       if(nargout >= 3) {
+        //todo
+        /*
         for(int t = 0; t < K; t++) {
           for(int d = 0; d < K; d++) {
             cv::Mat temp = cv::Mat::zeros(K, N, CV_64F);
-            D[o][t].push_back(temp);
+            H[o][t].push_back(temp);
           }
         }
+         */
       }
     }
 
     else {
-      //todo
+      int Mn = indices[o].rows;
+
+      for(int d = 0; d < K; d++) {
+        // Take one column of the exponents array of order o
+        auto D_indices = indices[o].col(d);
+        Mat2D Vd = Mat2D::zeros(Mn, N);
+
+        // Find all of the non-zero exponents, to avoid division by zero
+        int nz = 0;
+        for(int i = 0; i < D_indices.rows; i++) {
+          if(D_indices(i) != 0) {
+            V[o-1].row(nz).copyTo(Vd.row(i));
+            nz++;
+          }
+        }
+
+        // Multiply the lower order veronese map by the exponents of the
+        // relevant vector element
+        for(int j = 0; j < Vd.rows; j++) {
+          D[o][j].row(d) = D_indices(j)*Vd.row(j);
+        }
+      }
     }
   }
 
@@ -166,8 +158,31 @@ std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const cv::M
   }
 
   else {
+    auto Vlast = V.back();
+    auto Dlast = D.back();
+    //auto Hlast = H.back();
+
+    Mat2D V_keep = Mat2D::zeros(numKeepDimensions, Vlast.cols);
+    Mat3D D_keep((unsigned int)numKeepDimensions);//todo: check difference between uint and unsigned int
+
+    int tn = 0;
+    for(int j = 0; j < keepDimensions.rows; j++) {
+      if(keepDimensions(j)) {
+        Vlast.row(j).copyTo(V_keep.row(tn));
+        D_keep[tn] = Dlast[j];
+        tn++;
+      }
+    }
+    Mat2DArray Vvec;
+    Mat3DArray Dvec;
+    Mat4DArray Hvec;
+
+    Vvec.push_back(V_keep);
+    Dvec.push_back(D_keep);
+
     //todo
-    return std::make_tuple(V, D, H);
+    //Hvec.push_back(H_keep);
+
+    return std::make_tuple(Vvec, Dvec, Hvec);
   }
 }
-

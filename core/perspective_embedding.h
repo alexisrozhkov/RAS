@@ -9,14 +9,16 @@
 #include <vector>
 #include <opencv2/core.hpp>
 
-typedef std::vector<cv::Mat> Mat2DArray;
+typedef cv::Mat1d Mat2D;
+typedef std::vector<Mat2D> Mat2DArray;
+
 typedef Mat2DArray Mat3D;
 typedef std::vector<Mat3D> Mat3DArray;
+
 typedef Mat3DArray Mat4D;
 typedef std::vector<Mat4D> Mat4DArray;
-typedef Mat4DArray Mat5D;
 
-std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const cv::Mat& data,
+std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const Mat2D& data,
                                                         const unsigned int order,
                                                         const bool all,
                                                         const int nargout);
