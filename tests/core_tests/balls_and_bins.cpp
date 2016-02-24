@@ -85,7 +85,7 @@ testing::AssertionResult isIntMatrixEqual(const cv::Mat1i& a, const cv::Mat1i& b
   return testing::AssertionSuccess();
 }
 
-class BallsAndBinsTest : public testing::TestWithParam<cv::Size>
+class BallsAndBinsTest : public testing::TestWithParam<std::tuple<int, int>>
 {
  public:
   virtual void SetUp(){}
@@ -99,20 +99,13 @@ void checkOutput(const cv::Mat1i& expected, const std::vector<cv::Mat1i>& result
 
 INSTANTIATE_TEST_CASE_P(First33Arguments,
                         BallsAndBinsTest,
-                        ::testing::Values(cv::Size(1, 1),
-                                          cv::Size(1, 2),
-                                          cv::Size(1, 3),
-                                          cv::Size(2, 1),
-                                          cv::Size(2, 2),
-                                          cv::Size(2, 3),
-                                          cv::Size(3, 1),
-                                          cv::Size(3, 2),
-                                          cv::Size(3, 3)));
+                        ::testing::Combine(testing::Range(1, 4),
+                                           testing::Range(1, 4)));
 
 TEST_P(BallsAndBinsTest, checkResult)
 {
-  unsigned int balls = uint(GetParam().width),
-               bins = uint(GetParam().height);
+  unsigned int balls = uint(std::get<0>(GetParam())),
+               bins = uint(std::get<1>(GetParam()));
 
   cv::Mat1i expectMat = getExpectedMat(balls, bins);
 
