@@ -24,6 +24,8 @@ std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const Mat2D
   unsigned int K = uint(data.rows),
                N = uint(data.cols);
 
+  assert(K >= 4);
+
   auto indices = balls_and_bins(2*order, K, true);
 
   // For quadratic cases, we have to enforce the two diagonal minor matrices

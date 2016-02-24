@@ -4,18 +4,19 @@
 using namespace std;
 
 // Matlab-friendly notation for testing
+// matchesData = [1; 2; 3; 4]
+// matchesData = [1, 5; 2, 6; 3, 7; 4, 8]
 // matchesData = [100, 400; 100, 500; 200, 600; 100, 700; 1, 1]
 // matchesData = [100, 400; 100, 0; 200, 600; 100, 700; 1, 1]
 // matchesData = [100, 400, 10, 0; 100, 500, 10, 50; 200, 600, 20, 60; 100, 700, 10, 70; 1, 1, 1, 1]
 
 int main() {
-  double matchesData[] = {100, 400,
-                          100,   0,
-                          200, 600,
-                          100, 700,
-                            1,   1};
+  double matchesData[] = {1,
+                          2,
+                          3,
+                          4};
 
-  auto tpl = (perspective_embedding(Mat2D(5, 2, matchesData), 2, false, 3));
+  auto tpl = (perspective_embedding(Mat2D(4, 1, matchesData), 1, false, 3));
 
   {
     auto V = std::get<0>(tpl).back();
@@ -24,6 +25,8 @@ int main() {
 
   {
     auto D = std::get<1>(tpl).back();
+
+    std::cout << D.size() << "x" << D[0].rows << "x" << D[0].cols << std::endl;
 
     // Matlab-like printing for easier checking
     std::cout.precision(4);
