@@ -18,9 +18,11 @@ typedef std::vector<Mat3D> Mat3DArray;
 typedef Mat3DArray Mat4D;
 typedef std::vector<Mat4D> Mat4DArray;
 
-std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const Mat2D& data,
-                                                        const unsigned int order,
-                                                        const bool all=false,
-                                                        const int nargout=3);
+typedef std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> Embedding;
+
+Embedding perspective_embedding(const Mat2D& data,
+                                const unsigned int order,
+                                const bool all=false,
+                                const int nargout=3);
 
 #endif //RAS_PERSPECTIVE_EMBEDDING_H

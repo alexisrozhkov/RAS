@@ -17,10 +17,10 @@ inline bool all_1i(const cv::Mat& mat) {
   return 1;
 }
 
-std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> perspective_embedding(const Mat2D &data,
-                                                                     const unsigned int order,
-                                                                     const bool all,
-                                                                     const int nargout) {
+Embedding perspective_embedding(const Mat2D &data,
+                                const unsigned int order,
+                                const bool all,
+                                const int nargout) {
   unsigned int K = uint(data.rows),
                N = uint(data.cols);
 
