@@ -2,6 +2,8 @@
 // Created by alexey on 25.02.2016.
 //
 
+#include <cmath>
+
 #include "gtest/gtest.h"
 #include <perspective_embedding.h>
 #include "perspective_embedding_data.h"
@@ -20,7 +22,7 @@ testing::AssertionResult isDblMatrixEqual(const Mat2D& a, const Mat2D& b) {
 
   for(int j = 0; j < a.rows; j++) {
      for(int i = 0; i < a.cols; i++) {
-       if(fabs(a(j, i) - b(j, i)) > comparisonEpsilon) {
+       if((std::isnan(a(j, i))) || (std::isnan(b(j, i))) || (fabs(a(j, i) - b(j, i)) > comparisonEpsilon)) {
           return testing::AssertionFailure() << testing::Message("Matrix content mismatch: ")
                << a(j, i) << testing::Message(" != ") <<  b(j, i);
        }
