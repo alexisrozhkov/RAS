@@ -20,6 +20,8 @@ typedef std::vector<Mat4D> Mat4DArray;
 
 typedef std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> Embedding;
 
+const int Kconst = 5;
+
 Embedding perspective_embedding(const Mat2D& data,
                                 const unsigned int order,
                                 const bool all=false,

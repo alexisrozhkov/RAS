@@ -30,12 +30,11 @@ testing::AssertionResult isDblMatrixEqual(const Mat2D& a, const Mat2D& b) {
   return testing::AssertionSuccess();
 }
 
-Embedding getExpectedEmbedding(const int K, const int N) {
-  assert(K >= 4 && K <= 5);
+Embedding getExpectedEmbedding(const bool zeros, const int N) {
   assert(N >= 1 && N <= 2);
 
-  const std::vector<double> *lookup = expectedVals[K-K_offset][N-N_offset];
-  int dims = lookup[0].size()/N;
+  const std::vector<double> *lookup = expectedVals[zeros][N-N_offset];
+  const int dims = int(lookup[0].size())/N, K = Kconst;
 
   Mat2D V = Mat2D(lookup[0]).reshape(0, dims);
 
@@ -71,7 +70,7 @@ Embedding getExpectedEmbedding(const int K, const int N) {
                          Mat4DArray{H});
 }
 
-class PerspectiveEmbeddingTest : public testing::TestWithParam<std::tuple<int, int>>
+class PerspectiveEmbeddingTest : public testing::TestWithParam<std::tuple<bool, int>>
 {
  public:
   virtual void SetUp(){}
@@ -79,23 +78,19 @@ class PerspectiveEmbeddingTest : public testing::TestWithParam<std::tuple<int, i
 };
 
 TEST(PerspectiveEmbeddingTest, checkDimensionValidation) {
-  //todo: replace assert with exception inside
-  EXPECT_DEATH(perspective_embedding(Mat2D::ones(0, 1), 1), "");
-  EXPECT_DEATH(perspective_embedding(Mat2D::ones(1, 1), 1), "");
-  EXPECT_DEATH(perspective_embedding(Mat2D::ones(2, 1), 1), "");
-  EXPECT_DEATH(perspective_embedding(Mat2D::ones(3, 1), 1), "");
-  perspective_embedding(Mat2D::ones(4, 1), 1);
-  perspective_embedding(Mat2D::ones(5, 1), 1);
+  EXPECT_DEATH(perspective_embedding(Mat2D::ones(Kconst-1, 1), 1), "");
+  perspective_embedding(Mat2D::ones(Kconst, 1), 1);
+  EXPECT_DEATH(perspective_embedding(Mat2D::ones(Kconst+1, 1), 1), "");
 }
 
 void checkEmbeddingEqual(const Embedding &a, const Embedding &b) {
-  auto V = std::get<0>(a).back();
-  auto D = std::get<1>(a).back();
-  auto H = std::get<2>(a).back();
+  const auto V = std::get<0>(a).back();
+  const auto D = std::get<1>(a).back();
+  const auto H = std::get<2>(a).back();
 
-  auto Ve = std::get<0>(b).back();
-  auto De = std::get<1>(b).back();
-  auto He = std::get<2>(b).back();
+  const auto Ve = std::get<0>(b).back();
+  const auto De = std::get<1>(b).back();
+  const auto He = std::get<2>(b).back();
 
   EXPECT_TRUE(isDblMatrixEqual(V, Ve));
 
@@ -115,17 +110,17 @@ void checkEmbeddingEqual(const Embedding &a, const Embedding &b) {
 
 INSTANTIATE_TEST_CASE_P(First22Arguments,
                         PerspectiveEmbeddingTest,
-                        ::testing::Combine(testing::Range(0, 2),
-                                           testing::Range(0, 2)));
+                        ::testing::Combine(testing::Bool(),
+                                           testing::Range(1, 3)));
 
 TEST_P(PerspectiveEmbeddingTest, checkResult) {
-  const int Kidx = std::get<0>(GetParam()),
-            Nidx = std::get<1>(GetParam()),
-            O = 1;
+  const bool hasZeros = std::get<0>(GetParam());
+  const int N = std::get<1>(GetParam()),
+            O = 1;  // currently number of checked motion groups is hardcoded here
+                    // maybe this should be covered with test too in future
 
-  const int K = Kidx+K_offset, N = Nidx+N_offset;
-  Mat2D input = Mat2D(inputData[Kidx][Nidx]).reshape(0, K);
+  const Mat2D input = Mat2D(inputData[hasZeros][N-N_offset]).reshape(0, Kconst);
 
   checkEmbeddingEqual(perspective_embedding(input, O),
-                      getExpectedEmbedding(K, N));
+                      getExpectedEmbedding(hasZeros, N));
 }

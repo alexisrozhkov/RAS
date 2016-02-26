@@ -24,7 +24,7 @@ Embedding perspective_embedding(const Mat2D &data,
   unsigned int K = uint(data.rows),
                N = uint(data.cols);
 
-  assert(K >= 4);
+  assert(K == Kconst);
 
   auto indices = balls_and_bins(2*order, K, true);
 

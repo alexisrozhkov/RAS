@@ -14,7 +14,7 @@ cv::Mat1i getExpectedMat(const int balls, const int bins) {
   auto expectedVec = expectedVals[balls-1][bins-1];
   int rows = int(expectedVec.size())/bins;
 
-  cv::Mat1i expectMat = cv::Mat1i(expectedVec).t();
+  cv::Mat1i expectMat = cv::Mat1i(expectedVec).t();  // todo: check why this transpose is needed
   return expectMat.reshape(0, rows);
 }
 
