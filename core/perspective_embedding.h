@@ -24,7 +24,6 @@ const int Kconst = 5;
 
 Embedding perspective_embedding(const Mat2D& data,
                                 const unsigned int order,
-                                const bool all=false,
-                                const int nargout=3);
+                                const bool all=false);
 
 #endif //RAS_PERSPECTIVE_EMBEDDING_H

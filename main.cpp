@@ -10,13 +10,13 @@ using namespace std;
 // matchesData = [1, 6; 2, 7; 3, 8; 4, 9; 5, 10]
 
 int main() {
-  double matchesData52[] = {1, 6,
-                            2, 7,
+  double matchesData52[] = {0, 6,
+                            2, 0,
                             3, 8,
                             4, 9,
                             5, 10};
 
-  auto tpl = (perspective_embedding(Mat2D(5, 2, matchesData52), 1, false, 3));
+  auto tpl = (perspective_embedding(Mat2D(5, 2, matchesData52), 1, false));
 
   {
     auto V = std::get<0>(tpl).back();
