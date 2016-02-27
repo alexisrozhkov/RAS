@@ -4,10 +4,10 @@
 using namespace std;
 
 // Matlab-friendly notation for testing
-// matchesData = [1; 2; 3; 4]
 // matchesData = [1; 2; 3; 4; 5]
-// matchesData = [1, 5; 2, 6; 3, 7; 4, 8]
 // matchesData = [1, 6; 2, 7; 3, 8; 4, 9; 5, 10]
+// matchesData = [0; 2; 3; 4; 5]
+// matchesData = [0, 6; 2, 0; 3, 8; 4, 9; 5, 10]
 
 int main() {
   double matchesData52[] = {0, 6,

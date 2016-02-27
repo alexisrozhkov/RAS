@@ -1,9 +1,11 @@
 include_directories(${gtest_SOURCE_DIR}/include
                     ${gtest_SOURCE_DIR}
                     ../../core
-                    ../../core/utils)
+                    ../../core/utils
+                    utils)
 
 add_executable(runCoreTests
+               utils/mat_equal_test.cpp
                balls_and_bins.cpp
                perspective_embedding.cpp
                find_polynomials.cpp)

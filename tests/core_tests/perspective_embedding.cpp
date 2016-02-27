@@ -5,33 +5,11 @@
 #include <cmath>
 #include <tuple>
 #include <gtest/gtest.h>
-#include <perspective_embedding.h>
+#include <mat_equal_test.h>
 
 #include "perspective_embedding_data.h"
 
 
-const double comparisonEpsilon = 1e-10;
-
-testing::AssertionResult isDblMatrixEqual(const Mat2D& a, const Mat2D& b) {
-  if(a.type() != b.type()) {
-     return testing::AssertionFailure() << testing::Message("Matrix type mismatch");
-  }
-
-  if((a.cols != b.cols) || (a.rows != b.rows)) {
-     return testing::AssertionFailure() << testing::Message("Matrix size mismatch");
-  }
-
-  for(int j = 0; j < a.rows; j++) {
-     for(int i = 0; i < a.cols; i++) {
-       if((std::isnan(a(j, i))) || (std::isnan(b(j, i))) || (std::fabs(a(j, i) - b(j, i)) > comparisonEpsilon)) {
-          return testing::AssertionFailure() << testing::Message("Matrix content mismatch: ")
-               << a(j, i) << testing::Message(" != ") <<  b(j, i);
-       }
-     }
-  }
-
-  return testing::AssertionSuccess();
-}
 
 class PerspectiveEmbeddingTest : public testing::TestWithParam<std::tuple<bool, int>>
 {
