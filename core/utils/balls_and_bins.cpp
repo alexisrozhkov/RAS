@@ -6,7 +6,7 @@
 #include "balls_and_bins.h"
 
 
-typedef cv::Mat1i Cell;
+typedef IndexMat2D Cell;
 typedef std::vector<Cell> CellArray;
 typedef std::vector<CellArray> CellArray2D;
 

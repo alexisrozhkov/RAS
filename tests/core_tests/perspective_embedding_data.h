@@ -5,7 +5,7 @@
 #ifndef RAS_PERSPECTIVE_EMBEDDING_DATA_H
 #define RAS_PERSPECTIVE_EMBEDDING_DATA_H
 
-#include <vector>
+#include <perspective_embedding.h>
 
 const int N_offset = 1;
 
@@ -13,11 +13,14 @@ const int N_offset = 1;
 // indices stand for:
 // presence of zero entries(0 - no, 1 - yes),
 // number of points (N = idx+N_offset) and
-// matrix type(0 - veronese, 1 - jacobian, 2 - hessian)
-// that means expectedVals[0][1][2] is a precomputed hessian for N = 2 without zero entries
-const std::vector<double> expectedVals[2][2][3] = {
+// EmbeddingInitializer's underlying array index is for matrix type(0 - veronese, 1 - jacobian, 2 - hessian)
+// that means oneMotionExpected[0][1][2] is a precomputed hessian for N = 2 without zero entries
+
+// using double braces to initialize array's underlying aggregate like in:
+// http://stackoverflow.com/questions/6893700/how-to-construct-stdarray-object-with-initializer-list
+const EmbeddingInitializer oneMotionExpected[2][2] = {
 {
-  {
+  {{
     {3.0000,
      4.0000,
      5.0000,
@@ -87,8 +90,8 @@ const std::vector<double> expectedVals[2][2][3] = {
      0, 0, 1, 0, 0,
      0, 0, 0, 1, 0,
      0, 0, 0, 0, 2}
-  },
-  {
+  }},
+  {{
     {3.0000, 48.0000,
      4.0000, 54.0000,
      5.0000, 60.0000,
@@ -218,10 +221,10 @@ const std::vector<double> expectedVals[2][2][3] = {
      0, 0, 1, 0, 0,
      0, 0, 0, 1, 0,
      0, 0, 0, 0, 2}
-  }
+  }}
 },
 {
-  {
+  {{
     { 0,
       0,
       0,
@@ -292,8 +295,8 @@ const std::vector<double> expectedVals[2][2][3] = {
       0, 0, 0, 1, 0,
       0, 0, 0, 0, 2
     }
-  },
-  {
+  }},
+  {{
     { 0, 48,
       0, 54,
       0, 60,
@@ -426,13 +429,12 @@ const std::vector<double> expectedVals[2][2][3] = {
       0, 0, 0, 1, 0,
       0, 0, 0, 0, 2
     }
-  }
+  }}
 }
 };
 
 // these are the inputs, for which above data was precomputed. indices have same meaning as for output
-// (except the third one, which is not present here anyway)
-const std::vector<double> inputData[2][2] = {
+const std::vector<double> oneMotionInput[2][2] = {
   {
     {1,
      2,
@@ -473,9 +475,8 @@ const std::vector<double> twoMotionsInput= {
   }
 };
 
-// the only index here has the same meaning as third index in data for one motion case
-const std::vector<double> twoMotionsExpected[3] = {
-  {
+const EmbeddingInitializer twoMotionsExpected = {
+  {{
     0, 2304,
     0, 2592,
     0, 2880,
@@ -960,7 +961,7 @@ const std::vector<double> twoMotionsExpected[3] = {
     0, 0, 0, 360, 162,
     0, 0, 0, 300, 540,
     0, 0, 0, 0, 1200
-  }
+  }}
 };
 
 #endif //RAS_PERSPECTIVE_EMBEDDING_DATA_H

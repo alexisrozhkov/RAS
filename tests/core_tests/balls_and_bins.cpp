@@ -2,8 +2,9 @@
 // Created by alexey on 21.02.16.
 //
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 #include <balls_and_bins.h>
+
 #include "balls_and_bins_data.h"
 
 
@@ -57,8 +58,8 @@ INSTANTIATE_TEST_CASE_P(First33Arguments,
 
 TEST_P(BallsAndBinsTest, checkResult)
 {
-  unsigned int balls = uint(std::get<0>(GetParam())),
-               bins = uint(std::get<1>(GetParam()));
+  unsigned int balls = (uint)std::get<0>(GetParam()),
+               bins =  (uint)std::get<1>(GetParam());
 
   cv::Mat1i expectMat = getExpectedMat(balls, bins);
 

@@ -9,7 +9,7 @@
 Mat3D Mat3D_zeros(const int A,
                   const int B,
                   const int C) {
-  auto temp = Mat2DArray(uint(A));
+  auto temp = Mat2DArray((uint)A);
 
   for(int k = 0; k < A; k++) {
     temp[k] = Mat2D::zeros(B, C);
@@ -22,7 +22,7 @@ Mat4D Mat4D_zeros(const int A,
                   const int B,
                   const int C,
                   const int D) {
-  auto temp = Mat3DArray(uint(A));
+  auto temp = Mat3DArray((uint)A);
 
   for(int k = 0; k < A; k++) {
     temp[k] = Mat3D_zeros(B, C, D);
@@ -31,31 +31,10 @@ Mat4D Mat4D_zeros(const int A,
   return temp;
 }
 
-// For quadratic cases, we have to enforce that two diagonal minor matrices
-// are zero. So we drop all dimensions in the veronese maps whose exponents
-// are larger than order/2.
-cv::Mat1i chooseDimensionsToKeep(const cv::Mat1i &lastIndices,
-                                 const int order,
-                                 int &numKeepDimensionsOut) {
-  const int numDimensions = lastIndices.rows;
-  cv::Mat1i keepDimensions(numDimensions, 1);
-
-  numKeepDimensionsOut = 0;
-  for(int k = 0; k < numDimensions; k++) {
-    keepDimensions(k) =
-        ((lastIndices(k, 0) + lastIndices(k, 1)) <= order) &&
-        ((lastIndices(k, 2) + lastIndices(k, 3)) <= order);
-
-    numKeepDimensionsOut += keepDimensions(k);
-  }
-
-  return keepDimensions;
-}
-
-cv::Mat1i zeroCols(const Mat2D &data,
-                   bool &hasZeros) {
+IndexMat2D findZeroCols(const Mat2D &data,
+                        bool &hasZeros) {
   hasZeros = false;
-  cv::Mat1i zeroData = cv::Mat1i::zeros(data.cols, 1);
+  IndexMat2D zeroData = IndexMat2D::zeros(data.cols, 1);
 
   for(int i = 0; i < data.cols; i++) {
     for(int j = 0; j < data.rows; j++) {
@@ -68,49 +47,96 @@ cv::Mat1i zeroCols(const Mat2D &data,
   return zeroData;
 }
 
+inline void Embedding::computeVeroneseMappingMat(Mat2D &out,
+                                                 const int o) const {
+  Mat2D temp = indicesFlt[o] * logData;
+  cv::exp(temp, out);
+}
+
+inline void Embedding::computeVeroneseMappingCol(Mat2D &out,
+                                                 const int o,
+                                                 const int n) const {
+  Mat2D temp = indicesFlt[o] * logData.col(n);
+  cv::exp(temp, out.col(n));
+}
+
+inline void Embedding::computeVeroneseMappingElem(Mat2D &out,
+                                                  const int o,
+                                                  const int n,
+                                                  const int k) const {
+  out(k, n) = 1;
+
+  for(int i = 0; i < K; i++) {
+    out(k, n) *= std::pow((EmbValT)data(i, n), (EmbValT)indicesFlt[o](k, i));
+  }
+}
+
+void Embedding::computeVeroneseMapping(const int o, Mat2D &vOut) const {
+  const int dims = indices[o].rows;
+  vOut = Mat2D::zeros(dims, N);
+
+  // Trick to compute the Veronese map using matrix multiplication
+  if(!hasZeros) {
+    // No exact 0 element in the data, log(Data) is finite, with possible complex terms when the data value is negative
+    computeVeroneseMappingMat(vOut, o);
+  }
+
+  else {
+    for(int n = 0; n < N; n++) {
+      if(zeroCols(n) > 0) {
+        // data(n) has 0 elements that are left unprocessed above.
+        for(int k = 0; k < dims; k++) {
+          computeVeroneseMappingElem(vOut, o, n, k);
+        }
+      }
+
+      else {
+        computeVeroneseMappingCol(vOut, o, n);
+      }
+    }
+  }
+}
+
+// hacky way to handle different ways to index Mat2D and Mat3D in a similar fashion
 template<typename T> struct SliceMat {};
 
 template<>
 struct SliceMat<Mat2D> {
-  static cv::Mat_<double> getSliceRow(const Mat2D &Mat1, const int idx1, const int idx2)   {
-    return Mat1.row(idx1 == -1 ? idx2 : idx1);
+  static Mat2D getSliceRow(const Mat2D &m, const int idx1, const int idx2)   {
+    return m.row(idx1 == -1 ? idx2 : idx1);
   }
 };
 
 template<>
 struct SliceMat<Mat3D> {
-  static cv::Mat_<double> getSliceRow(const Mat3D &Mat1, const int idx1, const int idx2)   {
-    return Mat1[idx1].row(idx2);
+  static Mat2D getSliceRow(const Mat3D &m, const int idx1, const int idx2)   {
+    return m[idx1].row(idx2);
   }
 };
 
-// calculation of jacobian and hessian values are very similar, excpet for the matrix indexing
-// this is exploited here, and for indexing a bit of trait-like code is introduced
+// calculation of jacobian and hessian values are very similar, except for the matrix indexing
+// this is used here, and for indexing a bit of trait-like code is introduced
 // expects Mat2 to be zero-initialized
 template<typename T>
-void calcDeriv(const cv::Mat1i &indices,
-               const int idx1,
-               const int idx2,
-               const T &Mat1,
-               std::vector<T> &Mat2) {
-  auto D_indices = indices.col(idx1);
+void Embedding::calcDeriv(const int o,
+                          const int idx1,
+                          const int idx2,
+                          const T &Mat1,
+                          std::vector<T> &Mat2) const {
+  const auto D_indices = indices[o].col(idx1);
 
-  // Find all of the non-zero exponents, to avoid division by zero
+  // consider only non-zero exponents
   int nz = 0;
-  for(int i = 0; i < indices.rows; i++) {
+  for(int i = 0; i < D_indices.rows; i++) {
     if(D_indices(i) != 0) {
-      // Multiply the lower order veronese map by the exponents of the
-      // relevant vector element
+      // Multiply the lower order map by the exponents of the relevant vector element
       SliceMat<T>::getSliceRow(Mat2[i], idx2, idx1) = D_indices(i)*SliceMat<T>::getSliceRow(Mat1, nz, idx2);
       nz++;
     }
   }
 }
 
-void swapMiddleNondiag(Mat4D &H,
-                       const int N,
-                       const int d,
-                       const int h) {
+void Embedding::swapMiddleNondiag(Mat4D &H, const int d, const int h) const {
   if(d != h) {
     for(int j = 0; j < H.size(); j++) {
       for(int i = 0; i < N; i++) {
@@ -120,154 +146,30 @@ void swapMiddleNondiag(Mat4D &H,
   }
 }
 
+void Embedding::computeDerivatives(const int o, Mat3D &dOut, Mat4D &hOut) const {
+  const int dims = indices[o].rows;
 
-// calc veronese map for whole matrix
-inline void calcVeroneseMat(const Mat2D &indicesFlt,
-                            const Mat2D &logData,
-                            Mat2D &out) {
-  Mat2D temp = indicesFlt * logData;
-  cv::exp(temp, out); // (converting) conversion to real dropped
-}
+  dOut = Mat3D_zeros(dims, K, N);
+  hOut = Mat4D_zeros(dims, K, K, N);
 
-// calc veronese map for specified column
-inline void calcVeroneseCol(const int dataPoint,
-                            const Mat2D &indicesFlt,
-                            const Mat2D &logData,
-                            Mat2D &out) {
-  Mat2D temp = indicesFlt * logData.col(dataPoint);
-  cv::exp(temp, out.col(dataPoint)); // (converting) conversion to real dropped
-}
-
-// calc veronese map for specified element
-inline void calcVeroneseElem(const int rowCount,
-                             const int dataPoint,
-                             const Mat2D &indicesFlt,
-                             const Mat2D &data,
-                             Mat2D &out) {
-  out(rowCount, dataPoint) = 1;
-  for(int i = 0; i < data.rows; i++) {
-    out(rowCount, dataPoint) *= std::pow(data(i, dataPoint), indicesFlt(rowCount, i));
-  }
-}
-
-void computeVeroneseMapping(const Mat2D &indicesFlt,
-                            const Mat2D &logData,
-                            const Mat2D &data,
-                            const Mat2D &zeroData,
-                            const bool hasZeros,
-                            Mat2D &out) {
-  // Trick to compute the Veronese map using matrix multiplication
-  if(!hasZeros) {
-    // No exact 0 element in the data, log(Data) is finite, with possible complex terms when the data value is negative
-    calcVeroneseMat(indicesFlt, logData, out);
-  }
-
-  else {
-    for(int dataPoint = 0; dataPoint < logData.cols; dataPoint++) {
-      if(zeroData(dataPoint) > 0) {
-        // data(dataPoint) has 0 elements that are left unprocessed above.
-        for(int rowCount = 0; rowCount < indicesFlt.rows; rowCount++) {
-          calcVeroneseElem(rowCount, dataPoint, indicesFlt, data, out);
-        }
-      }
-
-      else {
-        calcVeroneseCol(dataPoint, indicesFlt, logData, out);
-      }
-    }
-  }
-}
-
-Embedding perspective_embedding(const Mat2D &data,
-                                const unsigned int order,
-                                const bool all) {
-  const unsigned int K = uint(data.rows),
-                     N = uint(data.cols);
-
-  assert(K == Kconst);
-
-  const auto indices = balls_and_bins(2*order, K, true);
-
-  return Embedding(N, K, order, data, indices, !all);
-}
-
-Embedding::Embedding(const int N,
-                     const int K,
-                     const unsigned int order,
-                     const Mat2D &data,
-                     const std::vector<cv::Mat1i> &indices,
-                     const bool filterDims):
-    veronese(2*order),
-    jacobian(2*order),
-    hessian(2*order),
-
-    indicesFlt(indices.size()),
-
-    logData(Mat2D::zeros(K, N)),
-    zeroData(zeroCols(data, hasZeros))
-{
-  for(int o = 0; o < 2*order; o++) {
-    const int dims = indices[o].rows;
-
-    veronese[o] = Mat2D::zeros(dims, N);
-    jacobian[o] = Mat3D_zeros(dims, K, N);
-    hessian[o] = Mat4D_zeros(dims, K, K, N);
-  }
-
-  // convert indices to floating point to make matrix types match in following multiplication
-  for(int i = 0; i < indices.size(); i++) {
-    indices[i].convertTo(indicesFlt[i], CV_64F);
-  }
-
-  // calc element-wise logarithm of data for faster Veronese mapping computation
-  cv::log(data, logData);
-
-  // compute veronese mapping and derivatives
-  for(int o = 0; o < 2*order; o++) {
-    computeVeroneseMapping(indicesFlt[o], logData, data, zeroData, hasZeros, veronese[o]);
-    computeDerivatives(indices[o], o, K, N);
-  }
-
-  if(filterDims) filterDimensions(indices.back(), order);
-}
-
-const Mat2DArray& Embedding::getV() const {
-  return veronese;
-}
-
-const Mat3DArray& Embedding::getD() const {
-  return jacobian;
-}
-
-const Mat4DArray& Embedding::getH() const {
-  return hessian;
-}
-
-void Embedding::computeDerivatives(const cv::Mat1i &indices,
-                                   const int o,
-                                   const int K,
-                                   const int N) {
   if(o == 0) {
     for(int d = 0; d < K; d++) {
-      jacobian[o][d].row(d) = Mat2D::ones(1, N);
+      dOut[d].row(d) = Mat2D::ones(1, N);
     }
   }
   else {
     for(int d = 0; d < K; d++) {
-      // Take one column of the exponents array of order o
-      calcDeriv(indices, d, -1, veronese[o - 1], jacobian[o]);
+      calcDeriv(o, d, -1, veronese[o - 1], dOut);
 
-      //if(nargout >= 3) {
       for(int h = d; h < K; h++) {
-        calcDeriv(indices, h, d, jacobian[o - 1], hessian[o]);
-        swapMiddleNondiag(hessian[o], N, d, h);
+        calcDeriv(o, h, d, jacobian[o - 1], hOut);
+        swapMiddleNondiag(hOut, d, h);
       }
-      //}
     }
   }
 }
 
-void Embedding::filterDimensions(const cv::Mat1i &indicesLast,
+void Embedding::filterDimensions(const IndexMat2D &indicesLast,
                                  const int order) {
   int numKeepDimensions = 0;
   const auto keepDimensions = chooseDimensionsToKeep(indicesLast, order, numKeepDimensions);
@@ -276,8 +178,8 @@ void Embedding::filterDimensions(const cv::Mat1i &indicesLast,
   const auto &D = jacobian.back();
   const auto &H = hessian.back();
 
-  Mat2D V_keep = Mat2D::zeros(numKeepDimensions, V.cols);
-  Mat3D D_keep((uint)numKeepDimensions);  // todo: check difference between uint() and (uint) casts
+  Mat2D V_keep = Mat2D::zeros(numKeepDimensions, N);
+  Mat3D D_keep((uint)numKeepDimensions);
   Mat4D H_keep((uint)numKeepDimensions);
 
   int kd = 0;
@@ -296,11 +198,117 @@ void Embedding::filterDimensions(const cv::Mat1i &indicesLast,
   hessian = Mat4DArray{H_keep};
 }
 
-Embedding::Embedding(const Mat2DArray &V,
-                     const Mat3DArray &D,
-                     const Mat4DArray &H):
-    veronese(V),
-    jacobian(D),
-    hessian(H) {
+// For quadratic cases, we have to enforce that two diagonal minor matrices
+// are zero. So we drop all dimensions in the veronese maps whose exponents
+// are larger than order/2.
+IndexMat2D Embedding::chooseDimensionsToKeep(const IndexMat2D &lastIndices,
+                                             const int order,
+                                             int &numKeepDimensionsOut) const {
+  const int numDimensions = lastIndices.rows;
+  IndexMat2D keepDimensions(numDimensions, 1);
 
+  numKeepDimensionsOut = 0;
+  for(int k = 0; k < numDimensions; k++) {
+    keepDimensions(k) =
+        ((lastIndices(k, 0) + lastIndices(k, 1)) <= order) &&
+            ((lastIndices(k, 2) + lastIndices(k, 3)) <= order);
+
+    numKeepDimensionsOut += keepDimensions(k);
+  }
+
+  return keepDimensions;
+}
+
+Embedding::Embedding(const Mat2D &data_,
+                     const unsigned int order,
+                     const bool filterDims):
+    veronese(2*order),
+    jacobian(2*order),
+    hessian(2*order),
+
+    data(data_),
+    logData(Mat2D::zeros(data.size())),
+    zeroCols(findZeroCols(data, hasZeros)),
+
+    K(data.rows),
+    N(data.cols),
+
+    indices(balls_and_bins(2*order, (uint)K, true))
+{
+  // convert indices to floating point to make matrix types match in following multiplication
+  indicesFlt = Mat2DArray(indices.size());
+  for(int i = 0; i < indices.size(); i++) {
+    indices[i].convertTo(indicesFlt[i], CV_64F);
+  }
+
+  // calc element-wise logarithm of data for faster Veronese mapping computation
+  cv::log(data, logData);
+
+  // compute veronese mapping and derivatives
+  for(int o = 0; o < 2*order; o++) {
+    computeVeroneseMapping(o, veronese[o]);
+    computeDerivatives(o, jacobian[o], hessian[o]);
+  }
+
+  if(filterDims) filterDimensions(indices.back(), order);
+}
+
+Embedding::Embedding(const EmbeddingInitializer &init, const int N_) :
+    K(Kconst),
+    N(N_) {
+  const int dims = int(init[0].size())/N;
+
+  Mat2D V = Mat2D(init[0]).reshape(0, dims);
+
+  Mat3D D((uint)dims);
+  for(int k = 0; k < dims; k++) {
+    D[k] = Mat2D(K, N);
+
+    for(int j = 0; j < K; j++) {
+      for(int i = 0; i < N; i++) {
+        D[k](j, i) = init[1][(i*dims + k)*K + j];
+      }
+    }
+  }
+
+  Mat4D H((uint)dims);
+
+  for(int l = 0; l < dims; l++) {
+    H[l] = Mat3D((uint)K);
+
+    for(int k = 0; k < K; k++) {
+      H[l][k] = Mat2D(K, N);
+
+      for(int j = 0; j < K; j++) {
+        for(int i = 0; i < N; i++) {
+          H[l][k](j, i) = init[2][((i*K + j)*dims + l)*K + k];
+        }
+      }
+    }
+  }
+
+  veronese.push_back(V);
+  jacobian.push_back(D);
+  hessian.push_back(H);
+}
+
+const Mat2DArray& Embedding::getV() const {
+  return veronese;
+}
+
+const Mat3DArray& Embedding::getD() const {
+  return jacobian;
+}
+
+const Mat4DArray& Embedding::getH() const {
+  return hessian;
+}
+
+
+Embedding perspective_embedding(const Mat2D &data,
+                                const unsigned int order,
+                                const bool all) {
+  assert(data.rows == Kconst);
+
+  return Embedding(data, order, !all);
 }

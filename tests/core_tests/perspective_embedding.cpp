@@ -4,9 +4,9 @@
 
 #include <cmath>
 #include <tuple>
-
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 #include <perspective_embedding.h>
+
 #include "perspective_embedding_data.h"
 
 
@@ -23,7 +23,7 @@ testing::AssertionResult isDblMatrixEqual(const Mat2D& a, const Mat2D& b) {
 
   for(int j = 0; j < a.rows; j++) {
      for(int i = 0; i < a.cols; i++) {
-       if((std::isnan(a(j, i))) || (std::isnan(b(j, i))) || (fabs(a(j, i) - b(j, i)) > comparisonEpsilon)) {
+       if((std::isnan(a(j, i))) || (std::isnan(b(j, i))) || (std::fabs(a(j, i) - b(j, i)) > comparisonEpsilon)) {
           return testing::AssertionFailure() << testing::Message("Matrix content mismatch: ")
                << a(j, i) << testing::Message(" != ") <<  b(j, i);
        }
@@ -33,49 +33,6 @@ testing::AssertionResult isDblMatrixEqual(const Mat2D& a, const Mat2D& b) {
   return testing::AssertionSuccess();
 }
 
-Embedding getExpectedEmbedding(const std::vector<double> *lookup, const int N) {
-  const int dims = int(lookup[0].size())/N, K = Kconst;
-
-  Mat2D V = Mat2D(lookup[0]).reshape(0, dims);
-
-  Mat3D D((uint)dims);
-  for(int k = 0; k < dims; k++) {
-    D[k] = Mat2D(K, N);
-
-    for(int j = 0; j < K; j++) {
-      for(int i = 0; i < N; i++) {
-        D[k](j, i) = lookup[1][(i*dims + k)*K + j];
-      }
-    }
-  }
-
-  Mat4D H((uint)dims);
-
-  for(int l = 0; l < dims; l++) {
-    H[l] = Mat3D((uint)K);
-
-    for(int k = 0; k < K; k++) {
-      H[l][k] = Mat2D(K, N);
-
-      for(int j = 0; j < K; j++) {
-        for(int i = 0; i < N; i++) {
-          H[l][k](j, i) = lookup[2][((i*K + j)*dims + l)*K + k];
-        }
-      }
-    }
-  }
-
-  return Embedding(Mat2DArray{V},
-                   Mat3DArray{D},
-                   Mat4DArray{H});
-}
-
-Embedding getExpectedEmbeddingFromArr(const bool zeros, const int N) {
-  assert(N >= 1 && N <= 2);
-  const std::vector<double> *lookup = expectedVals[zeros][N-N_offset];
-  return getExpectedEmbedding(lookup, N);
-}
-
 class PerspectiveEmbeddingTest : public testing::TestWithParam<std::tuple<bool, int>>
 {
  public:
@@ -83,6 +40,8 @@ class PerspectiveEmbeddingTest : public testing::TestWithParam<std::tuple<bool, 
   virtual void TearDown(){}
 };
 
+// this could have been implemented as a comparison operator of Embedding, but this way it provides a more verbose way
+// of testing equality (dimension and data mismatches are reported separately, besides mismatching values are shown)
 void checkEmbeddingEqual(const Embedding &a, const Embedding &b) {
   const auto V = a.getV().back();
   const auto D = a.getD().back();
@@ -117,10 +76,14 @@ TEST_P(PerspectiveEmbeddingTest, check1Motion) {
   const bool hasZeros = std::get<0>(GetParam());
   const int N = std::get<1>(GetParam()), O = 1;
 
-  const Mat2D input = Mat2D(inputData[hasZeros][N-N_offset]).reshape(0, Kconst);
+  assert(N >= 1 && N <= 2);
+
+  const int Nidx = N-N_offset;
+
+  const Mat2D input = Mat2D(oneMotionInput[hasZeros][Nidx]).reshape(0, Kconst);
 
   checkEmbeddingEqual(perspective_embedding(input, O),
-                      getExpectedEmbeddingFromArr(hasZeros, N));
+                      Embedding(oneMotionExpected[hasZeros][Nidx], N));
 }
 
 TEST(PerspectiveEmbeddingTest, check2Motions) {
@@ -129,7 +92,7 @@ TEST(PerspectiveEmbeddingTest, check2Motions) {
   const Mat2D input = Mat2D(twoMotionsInput).reshape(0, Kconst);
 
   checkEmbeddingEqual(perspective_embedding(input, O),
-                      getExpectedEmbedding(twoMotionsExpected, N));
+                      Embedding(twoMotionsExpected, N));
 }
 
 TEST(PerspectiveEmbeddingTest, checkDimensionValidation) {

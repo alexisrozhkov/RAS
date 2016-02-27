@@ -16,21 +16,18 @@ int main() {
                             4, 9,
                             5, 10};
 
-  auto tpl = (perspective_embedding(Mat2D(5, 2, matchesData52), 2, false));
+  auto embedding = (perspective_embedding(Mat2D(5, 2, matchesData52), 2, false));
 
   {
-    auto V = std::get<0>(tpl).back();
+    auto V = embedding.getV().back();
     std::cout << V << "\n------------------\n";
   }
 
   {
-    auto D = std::get<1>(tpl).back();
+    auto D = embedding.getD().back();
 
     std::cout << D.size() << "x" << D[0].rows << "x" << D[0].cols << std::endl;
 
-    // Matlab-like printing for easier checking
-    //std::cout.precision(4);
-    //std::cout << std::scientific;
 
     for (int k = 0; k < D[0].cols; k++) {
       for(int j = 0; j < D.size(); j++) {
@@ -44,7 +41,7 @@ int main() {
   }
 
   {
-    auto H = std::get<2>(tpl).back();
+    auto H = embedding.getH().back();
 
     std::cout << H.size() << "x" << H[0].size() << "x" << H[0][0].rows << "x" << H[0][0].cols << std::endl;
 
