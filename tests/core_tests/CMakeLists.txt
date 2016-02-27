@@ -5,6 +5,7 @@ include_directories(${gtest_SOURCE_DIR}/include
 
 add_executable(runCoreTests
                balls_and_bins.cpp
-               perspective_embedding.cpp)
+               perspective_embedding.cpp
+               find_polynomials.cpp)
 
 target_link_libraries(runCoreTests gtest gtest_main RAS)

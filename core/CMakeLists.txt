@@ -9,7 +9,8 @@ include_directories(utils)
 
 set(CORE_FILES
     utils/balls_and_bins.cpp
-    perspective_embedding.cpp)
+    perspective_embedding.cpp
+    find_polynomials.cpp)
 
 add_library(RAS STATIC ${CORE_FILES})
 target_link_libraries(RAS ${OpenCV_LIBS})
