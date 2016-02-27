@@ -3,6 +3,7 @@
 //
 
 #include <cmath>
+#include <tuple>
 
 #include "gtest/gtest.h"
 #include <perspective_embedding.h>
@@ -64,9 +65,9 @@ Embedding getExpectedEmbedding(const std::vector<double> *lookup, const int N) {
     }
   }
 
-  return std::make_tuple(Mat2DArray{V},
-                         Mat3DArray{D},
-                         Mat4DArray{H});
+  return Embedding(Mat2DArray{V},
+                   Mat3DArray{D},
+                   Mat4DArray{H});
 }
 
 Embedding getExpectedEmbeddingFromArr(const bool zeros, const int N) {
@@ -83,13 +84,13 @@ class PerspectiveEmbeddingTest : public testing::TestWithParam<std::tuple<bool, 
 };
 
 void checkEmbeddingEqual(const Embedding &a, const Embedding &b) {
-  const auto V = std::get<0>(a).back();
-  const auto D = std::get<1>(a).back();
-  const auto H = std::get<2>(a).back();
+  const auto V = a.getV().back();
+  const auto D = a.getD().back();
+  const auto H = a.getH().back();
 
-  const auto Ve = std::get<0>(b).back();
-  const auto De = std::get<1>(b).back();
-  const auto He = std::get<2>(b).back();
+  const auto Ve = b.getV().back();
+  const auto De = b.getD().back();
+  const auto He = b.getH().back();
 
   EXPECT_TRUE(isDblMatrixEqual(V, Ve));
 

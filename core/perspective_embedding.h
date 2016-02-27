@@ -5,7 +5,6 @@
 #ifndef RAS_PERSPECTIVE_EMBEDDING_H
 #define RAS_PERSPECTIVE_EMBEDDING_H
 
-#include <tuple>
 #include <vector>
 #include <opencv2/core.hpp>
 
@@ -18,7 +17,45 @@ typedef std::vector<Mat3D> Mat3DArray;
 typedef Mat3DArray Mat4D;
 typedef std::vector<Mat4D> Mat4DArray;
 
-typedef std::tuple<Mat2DArray, Mat3DArray, Mat4DArray> Embedding;
+class Embedding {
+  Mat2DArray veronese;
+  Mat3DArray jacobian;
+  Mat4DArray hessian;
+
+  Mat2DArray indicesFlt;
+
+  Mat2D logData;
+
+  // indicates whether there are any zero entries in data
+  bool hasZeros;
+
+  // indicates whether there are zeros in each column of data
+  cv::Mat1i zeroData;
+
+  void computeDerivatives(const cv::Mat1i &indices,
+                          const int o,
+                          const int K,
+                          const int N);
+
+  void filterDimensions(const cv::Mat1i &indicesLast,
+                        const int order);
+
+ public:
+  Embedding(const int N,
+            const int K,
+            const unsigned int order,
+            const Mat2D &data,
+            const std::vector<cv::Mat1i> &indices,
+            const bool filterDims);
+
+  Embedding(const Mat2DArray &V,
+            const Mat3DArray &D,
+            const Mat4DArray &H);
+
+  const Mat2DArray& getV() const;
+  const Mat3DArray& getD() const;
+  const Mat4DArray& getH() const;
+};
 
 const int Kconst = 5;
 
