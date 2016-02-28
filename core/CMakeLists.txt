@@ -8,6 +8,7 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(utils)
 
 set(CORE_FILES
+    utils/ras_types.cpp
     utils/balls_and_bins.cpp
     perspective_embedding.cpp
     find_polynomials.cpp)

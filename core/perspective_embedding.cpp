@@ -332,3 +332,11 @@ Embedding perspective_embedding(const Mat2D &data,
 
   return Embedding(data, order, !all);
 }
+
+std::ostream &operator<<(std::ostream &os, Embedding const &e) {
+  os << e.getV().back() << std::endl << std::endl;
+  os << e.getD().back() << std::endl;
+  os << e.getH().back() << std::endl;
+
+  return os;
+}

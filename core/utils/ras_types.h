@@ -7,6 +7,7 @@
 
 #include <array>
 #include <vector>
+#include <ostream>
 #include <opencv2/core.hpp>
 
 
@@ -30,5 +31,9 @@ typedef std::vector<Mat4D> Mat4DArray;
 
 
 typedef std::array<std::vector<EmbValT>, 3> EmbeddingInitializer;
+
+
+std::ostream &operator<<(std::ostream &os, Mat3D const &m);
+std::ostream &operator<<(std::ostream &os, Mat4D const &m);
 
 #endif //RAS_RAS_TYPES_H

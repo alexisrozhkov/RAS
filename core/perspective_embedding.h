@@ -5,6 +5,7 @@
 #ifndef RAS_PERSPECTIVE_EMBEDDING_H
 #define RAS_PERSPECTIVE_EMBEDDING_H
 
+#include <ostream>
 #include <ras_types.h>
 
 
@@ -57,6 +58,8 @@ class Embedding {
   const Mat3DArray& getD() const;
   const Mat4DArray& getH() const;
 };
+
+std::ostream &operator<<(std::ostream &os, Embedding const &e);
 
 const int Kconst = 5;
 
