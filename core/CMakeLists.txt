@@ -6,10 +6,12 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 include_directories(utils)
+include_directories(../3rdparty)
 
 set(CORE_FILES
     utils/ras_types.cpp
     utils/balls_and_bins.cpp
+    utils/generalized_eigenvalues.cpp
     perspective_embedding.cpp
     find_polynomials.cpp)
 

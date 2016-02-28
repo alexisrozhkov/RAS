@@ -8,5 +8,6 @@ Reference implementation:
 http://perception.csl.illinois.edu/ras/  
   
 Dependencies:  
-OpenCV 3.0  
+OpenCV 3.0
+Eigen (download the sources and drop them at 3rdparty/Eigen)
 Google Test (download the sources and drop them at tests/googletest)  

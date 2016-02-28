@@ -4,7 +4,6 @@
 
 #include "mat_equal_test.h"
 
-const EmbValT comparisonEpsilon = 1e-10;
 
 testing::AssertionResult isIntMatrixEqual(const IndexMat2D& a, const IndexMat2D& b) {
   if(a.type() != b.type()) {
@@ -26,7 +25,7 @@ testing::AssertionResult isIntMatrixEqual(const IndexMat2D& a, const IndexMat2D&
   return testing::AssertionSuccess();
 }
 
-testing::AssertionResult isDblMatrixEqual(const Mat2D& a, const Mat2D& b) {
+testing::AssertionResult isDblMatrixEqual(const Mat2D& a, const Mat2D& b, const EmbValT comparisonEpsilon) {
   if(a.type() != b.type()) {
     return testing::AssertionFailure() << testing::Message("Matrix type mismatch");
   }

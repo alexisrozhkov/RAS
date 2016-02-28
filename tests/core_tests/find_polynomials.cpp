@@ -17,21 +17,16 @@ class FindPolynomialsTest : public testing::TestWithParam<std::tuple<int, int>>
   virtual void TearDown(){}
 };
 
-INSTANTIATE_TEST_CASE_P(First22Arguments,
-                        FindPolynomialsTest,
-                        ::testing::Combine(testing::Range(0, 2),
-                                           testing::Range(0, 2)));
+template <typename T> int sgn(T val) {
+  return (T(0) < val) - (val < T(0));
+}
 
-
-TEST_P(FindPolynomialsTest, checkRes) {
-  unsigned int zIdx = (uint)std::get<0>(GetParam()),
-               nIdx =  (uint)std::get<1>(GetParam());
-
+TEST(FindPolynomialsTest, checkRes) {
   const int cols = 9;
-  const int rows = int(oneMotion[zIdx][nIdx].size())/cols;
-  const Mat2D expected = Mat2D(oneMotion[zIdx][nIdx]).reshape(0, rows);
+  const int rows = int(outputBetterConditioned.size())/cols;
 
-  const Mat2D inputMat = Mat2D(input[zIdx][nIdx]).reshape(0, Kconst);
+  const Mat2D expected = Mat2D(outputBetterConditioned).reshape(0, rows);
+  const Mat2D inputMat = Mat2D(inputBetterConditioned).reshape(0, Kconst);
 
   auto e = perspective_embedding(inputMat, 1);
 
@@ -40,8 +35,13 @@ TEST_P(FindPolynomialsTest, checkRes) {
                                  FISHER,
                                  cols);
 
-  std::cout << expected << std::endl;
-
   EXPECT_EQ(result.size(), expected.size());
-  EXPECT_TRUE(isDblMatrixEqual(result, expected));
+
+  // handle the eigenvec 'sign' ambiguity
+  for(int i = 0; i < result.cols; i++) {
+    int sign = sgn(expected(0, i)) == sgn(result(0, i)) ? 1 : -1;
+
+    // bigger epsilon since the mantissa in outputBetterConditioned is specified only up to 6th digit
+    EXPECT_TRUE(isDblMatrixEqual(sign*result.col(i), expected.col(i), 1e-5));
+  }
 }
