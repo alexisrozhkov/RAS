@@ -13,7 +13,7 @@ Mat2D find_polynomials(const Mat2D &data,
                        const FindPolyMethod method,
                        const int charDimension) {
   if(method == FISHER) {
-    EmbValT RAYLEIGHQUOTIENT_EPSILON = 10;
+    const EmbValT RAYLEIGHQUOTIENT_EPSILON = 10;
 
     const int veroneseDimension = (uint)derivative.size(),
               dimensionCount = derivative[0].rows,
@@ -37,8 +37,6 @@ Mat2D find_polynomials(const Mat2D &data,
 
     Mat2D al, be;
     generalizedEigenvals(A, B, al, be);
-    //std::cout << al << std::endl;
-    //std::cout << be << std::endl;
     // not sure if element-wise al/be ratios are sorted or not... todo: check
     Mat2D out(veroneseDimension, charDimension);
 
