@@ -4,9 +4,9 @@
 
 #include "mat_equal_test.h"
 
-const double comparisonEpsilon = 1e-10;
+const EmbValT comparisonEpsilon = 1e-10;
 
-testing::AssertionResult isIntMatrixEqual(const cv::Mat1i& a, const cv::Mat1i& b) {
+testing::AssertionResult isIntMatrixEqual(const IndexMat2D& a, const IndexMat2D& b) {
   if(a.type() != b.type()) {
     return testing::AssertionFailure() << testing::Message("Matrix type mismatch");
   }

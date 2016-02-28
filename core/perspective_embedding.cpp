@@ -6,6 +6,7 @@
 #include "perspective_embedding.h"
 
 
+// utilities
 Mat3D Mat3D_zeros(const int A,
                   const int B,
                   const int C) {
@@ -31,22 +32,47 @@ Mat4D Mat4D_zeros(const int A,
   return temp;
 }
 
-IndexMat2D findZeroCols(const Mat2D &data,
-                        bool &hasZeros) {
-  hasZeros = false;
+IndexMat2D findZeroCols(const Mat2D &data) {
   IndexMat2D zeroData = IndexMat2D::zeros(data.cols, 1);
 
   for(int i = 0; i < data.cols; i++) {
     for(int j = 0; j < data.rows; j++) {
       zeroData(i) += data(j, i) == 0;  // todo: maybe replace exact comparison with some epsilon
     }
-
-    if(zeroData(i) > 0) hasZeros = true;
   }
 
   return zeroData;
 }
 
+bool checkZeros(const Mat2D &data) {
+  bool hasZeros = false;
+
+  for(int i = 0; i < data.rows; i++) {
+    if(data(i) > 0) {
+      hasZeros = true;
+      break;
+    }
+  }
+
+  return hasZeros;
+}
+
+inline Mat2D matLog(const Mat2D &mat) {
+  Mat2D out;
+  cv::log(mat, out);
+  return out;
+}
+
+inline Mat2DArray mat2dToFloat(const IndexMat2DArray &indices) {
+  Mat2DArray out = Mat2DArray(indices.size());
+  for(int i = 0; i < indices.size(); i++) {
+    indices[i].convertTo(out[i], CV_64F);
+  }
+  return out;
+}
+
+
+// Embedding methods
 inline void Embedding::computeVeroneseMappingMat(Mat2D &out,
                                                  const int o) const {
   Mat2D temp = indicesFlt[o] * logData;
@@ -222,29 +248,21 @@ IndexMat2D Embedding::chooseDimensionsToKeep(const IndexMat2D &lastIndices,
 Embedding::Embedding(const Mat2D &data_,
                      const unsigned int order,
                      const bool filterDims):
+    K(data_.rows),
+    N(data_.cols),
+
     veronese(2*order),
     jacobian(2*order),
     hessian(2*order),
 
     data(data_),
-    logData(Mat2D::zeros(data.size())),
-    zeroCols(findZeroCols(data, hasZeros)),
+    logData(matLog(data_)),
+    zeroCols(findZeroCols(data_)),
+    hasZeros(checkZeros(zeroCols)),
 
-    K(data.rows),
-    N(data.cols),
-
-    indices(balls_and_bins(2*order, (uint)K, true))
+    indices(balls_and_bins(2*order, (uint)K, true)),
+    indicesFlt(mat2dToFloat(indices))
 {
-  // convert indices to floating point to make matrix types match in following multiplication
-  indicesFlt = Mat2DArray(indices.size());
-  for(int i = 0; i < indices.size(); i++) {
-    indices[i].convertTo(indicesFlt[i], CV_64F);
-  }
-
-  // calc element-wise logarithm of data for faster Veronese mapping computation
-  cv::log(data, logData);
-
-  // compute veronese mapping and derivatives
   for(int o = 0; o < 2*order; o++) {
     computeVeroneseMapping(o, veronese[o]);
     computeDerivatives(o, jacobian[o], hessian[o]);
@@ -255,7 +273,9 @@ Embedding::Embedding(const Mat2D &data_,
 
 Embedding::Embedding(const EmbeddingInitializer &init, const int N_) :
     K(Kconst),
-    N(N_) {
+    N(N_),
+    hasZeros(false)  // true of false doesn't matter here
+{
   const int dims = int(init[0].size())/N;
 
   Mat2D V = Mat2D(init[0]).reshape(0, dims);

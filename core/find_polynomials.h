@@ -5,12 +5,14 @@
 #ifndef RAS_FIND_POLYNOMIALS_H
 #define RAS_FIND_POLYNOMIALS_H
 
-#include "perspective_embedding.h"
+#include <ras_types.h>
+
 
 enum FindPolyMethod {
   FISHER,
   LLE
 };
+
 
 Mat2D find_polynomials(const Mat2D &data,
                        const Mat3D &derivative,

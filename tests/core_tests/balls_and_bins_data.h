@@ -5,9 +5,10 @@
 #ifndef RAS_BALLS_AND_BINS_DATA_H
 #define RAS_BALLS_AND_BINS_DATA_H
 
-#include <vector>
+#include <ras_types.h>
 
-const std::vector<int> expectedVals[3][3] = {
+
+const std::vector<IndValT> expectedVals[3][3] = {
   {
     {1},
 

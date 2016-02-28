@@ -6,9 +6,10 @@
 #define RAS_MAT_EQUAL_TEST_H
 
 #include <gtest/gtest.h>
-#include <perspective_embedding.h>
+#include <ras_types.h>
 
-testing::AssertionResult isIntMatrixEqual(const cv::Mat1i& a, const cv::Mat1i& b);
-testing::AssertionResult isDblMatrixEqual(const Mat2D& a, const Mat2D& b);
+
+testing::AssertionResult isIntMatrixEqual(const IndexMat2D &a, const IndexMat2D &b);
+testing::AssertionResult isDblMatrixEqual(const Mat2D &a, const Mat2D &b);
 
 #endif //RAS_MAT_EQUAL_TEST_H

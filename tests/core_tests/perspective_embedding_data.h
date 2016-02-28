@@ -5,7 +5,7 @@
 #ifndef RAS_PERSPECTIVE_EMBEDDING_DATA_H
 #define RAS_PERSPECTIVE_EMBEDDING_DATA_H
 
-#include <perspective_embedding.h>
+#include <ras_types.h>
 
 const int N_offset = 1;
 
@@ -434,7 +434,7 @@ const EmbeddingInitializer oneMotionExpected[2][2] = {
 };
 
 // these are the inputs, for which above data was precomputed. indices have same meaning as for output
-const std::vector<double> oneMotionInput[2][2] = {
+const std::vector<EmbValT> oneMotionInput[2][2] = {
   {
     {1,
      2,
@@ -465,7 +465,7 @@ const std::vector<double> oneMotionInput[2][2] = {
 };
 
 // data for case of two motions
-const std::vector<double> twoMotionsInput= {
+const std::vector<EmbValT> twoMotionsInput= {
   {
     0, 6,
     2, 0,

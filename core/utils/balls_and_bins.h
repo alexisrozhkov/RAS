@@ -5,11 +5,8 @@
 #ifndef RAS_BALLS_AND_BINS_H
 #define RAS_BALLS_AND_BINS_H
 
-#include <vector>
-#include <opencv2/core.hpp>
+#include <ras_types.h>
 
-typedef cv::Mat1i IndexMat2D;
-typedef std::vector<IndexMat2D> IndexMat2DArray;
 
 // Enumerates all possible groupings of identical objects, i.e. balls in bins.
 // Note: This happens to be the same problem as computing the exponents of the veronese map.

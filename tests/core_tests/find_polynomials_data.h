@@ -5,7 +5,10 @@
 #ifndef RAS_FIND_POLYNOMIALS_DATA_H
 #define RAS_FIND_POLYNOMIALS_DATA_H
 
-const std::vector<double> input[2][2] = {
+#include <ras_types.h>
+
+
+const std::vector<EmbValT> input[2][2] = {
   {
     {1,
      2,
@@ -35,7 +38,7 @@ const std::vector<double> input[2][2] = {
   }
 };
 
-const std::vector<double> oneMotion[2][2] = {
+const std::vector<EmbValT> oneMotion[2][2] = {
   {
     { 
        3.7947e-01, 1.4606e-01, 6.5330e-02, -1.3434e-01, -1.3695e-01, 2.4112e-01, -4.6700e-01, -9.2360e-02, -7.1267e-01,

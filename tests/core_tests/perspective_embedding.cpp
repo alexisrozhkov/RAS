@@ -6,6 +6,7 @@
 #include <tuple>
 #include <gtest/gtest.h>
 #include <mat_equal_test.h>
+#include <perspective_embedding.h>
 
 #include "perspective_embedding_data.h"
 

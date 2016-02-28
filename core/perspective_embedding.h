@@ -5,42 +5,32 @@
 #ifndef RAS_PERSPECTIVE_EMBEDDING_H
 #define RAS_PERSPECTIVE_EMBEDDING_H
 
-#include <array>
-#include <vector>
-#include <balls_and_bins.h>
-#include <opencv2/core.hpp>
-
-
-typedef double EmbValT;
-typedef cv::Mat_<EmbValT> Mat2D;
-typedef std::vector<Mat2D> Mat2DArray;
-
-typedef Mat2DArray Mat3D;
-typedef std::vector<Mat3D> Mat3DArray;
-
-typedef Mat3DArray Mat4D;
-typedef std::vector<Mat4D> Mat4DArray;
-
-typedef std::array<std::vector<EmbValT>, 3> EmbeddingInitializer;
+#include <ras_types.h>
 
 
 class Embedding {
+  // input data dimensions
+  const int K, N;
+
+  // data that describes embedding
   Mat2DArray veronese;
   Mat3DArray jacobian;
   Mat4DArray hessian;
 
-  Mat2D data, logData;
-
-  // indicates whether there are any zero entries in data
-  bool hasZeros;
+  // copy of data and it's element-wise logarithm
+  const Mat2D data, logData;
 
   // indicates whether there are zeros in each column of data
-  IndexMat2D zeroCols;
+  const IndexMat2D zeroCols;
 
-  const int K, N;
+  // indicates whether there are any zero entries in data
+  const bool hasZeros;
 
+  // the exponents of the veronese map
   const IndexMat2DArray indices;
-  Mat2DArray indicesFlt;
+
+  // indices in floating point to make matrix types match during multiplication
+  const Mat2DArray indicesFlt;
 
   // veronese mapping
   inline void computeVeroneseMappingMat(Mat2D &out, const int o) const;

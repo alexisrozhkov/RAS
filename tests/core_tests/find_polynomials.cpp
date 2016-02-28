@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include <mat_equal_test.h>
+#include <perspective_embedding.h>
 #include <find_polynomials.h>
 
 #include "find_polynomials_data.h"
