@@ -33,14 +33,14 @@ void checkEmbeddingEqual(const Embedding &a, const Embedding &b) {
   EXPECT_TRUE(isDblMatrixEqual(V, Ve));
 
   EXPECT_EQ(D.size(), De.size());
-  for(int i = 0; i < D.size(); i++) {
+  for(uint i = 0; i < D.size(); i++) {
     EXPECT_TRUE(isDblMatrixEqual(D[i], De[i]));
   }
 
   EXPECT_EQ(H.size(), He.size());
-  for(int i = 0; i < H.size(); i++) {
+  for(uint i = 0; i < H.size(); i++) {
     EXPECT_EQ(H[0].size(), He[0].size());
-    for(int j = 0; j < H[0].size(); j++) {
+    for(uint j = 0; j < H[0].size(); j++) {
       EXPECT_TRUE(isDblMatrixEqual(H[i][j], He[i][j]));
     }
   }

@@ -10,25 +10,25 @@ IndexMat2DArray balls_and_bins(const unsigned int ballCount,
                          const bool all) {
   // Create a two dimensional cell array to hold solutions for smaller values of both ballCount and binCount.
   IndexMat2DArray2D outputCellArray2D;
-  for(int j = 0; j < ballCount; j++) {
+   for(uint j = 0; j < ballCount; j++) {
     outputCellArray2D.push_back(IndexMat2DArray(binCount));
   }
 
   // The top row of the cell array is given by identity matrices.
-  for(int column = 0; column < binCount; column++) {  // Column of the cell array, that is.
+  for(uint column = 0; column < binCount; column++) {  // Column of the cell array, that is.
     outputCellArray2D[0][column] = IndexMat2D::eye(column+1, column+1);
   }
 
   // The leftmost column of cell array (1 Bin) is also trivial.
-  for(int row = 0; row < ballCount; row++) {
+  for(uint row = 0; row < ballCount; row++) {
     outputCellArray2D[row][0] = IndexMat2D::ones(1, 1)*(row+1);
   }
 
   // Apply method of computing that exploits a pattern that becomes noticeable when the
   // arrangements are written out in increasing order.  The base cases for one ball and for
   // one bin are trivial, and the rest of the cases can be formed by induction in two directions.
-  for(int row = 1; row < ballCount; row++) {
-    for(int column = 1; column < binCount; column++) {
+  for(uint row = 1; row < ballCount; row++) {
+    for(uint column = 1; column < binCount; column++) {
       // Increment the first column of the case for one less ball.
       IndexMat2D upper = outputCellArray2D[row - 1][column].clone();
       upper.colRange(0, 1) += IndexMat2D::ones(upper.rows, 1);
@@ -50,7 +50,7 @@ IndexMat2DArray balls_and_bins(const unsigned int ballCount,
   }
 
   else {
-    for(int i = 0; i < ballCount; i++) outputCellArray.push_back(outputCellArray2D[i].back());
+    for(uint i = 0; i < ballCount; i++) outputCellArray.push_back(outputCellArray2D[i].back());
   }
 
   return outputCellArray;

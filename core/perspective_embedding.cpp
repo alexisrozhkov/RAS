@@ -65,7 +65,7 @@ inline Mat2D matLog(const Mat2D &mat) {
 
 inline Mat2DArray mat2dToFloat(const IndexMat2DArray &indices) {
   Mat2DArray out = Mat2DArray(indices.size());
-  for(int i = 0; i < indices.size(); i++) {
+  for(uint i = 0; i < indices.size(); i++) {
     indices[i].convertTo(out[i], CV_64F);
   }
   return out;
@@ -164,7 +164,7 @@ void Embedding::calcDeriv(const int o,
 
 void Embedding::swapMiddleNondiag(Mat4D &H, const int d, const int h) const {
   if(d != h) {
-    for(int j = 0; j < H.size(); j++) {
+    for(uint j = 0; j < H.size(); j++) {
       for(int i = 0; i < N; i++) {
         H[j][h](d, i) = H[j][d](h, i);
       }
@@ -263,7 +263,7 @@ Embedding::Embedding(const Mat2D &data_,
     indices(balls_and_bins(2*order, (uint)K, true)),
     indicesFlt(mat2dToFloat(indices))
 {
-  for(int o = 0; o < 2*order; o++) {
+  for(uint o = 0; o < 2*order; o++) {
     computeVeroneseMapping(o, veronese[o]);
     computeDerivatives(o, jacobian[o], hessian[o]);
   }

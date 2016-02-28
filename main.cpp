@@ -30,7 +30,7 @@ int main() {
 
 
     for (int k = 0; k < D[0].cols; k++) {
-      for(int j = 0; j < D.size(); j++) {
+      for(uint j = 0; j < D.size(); j++) {
         for(int i = 0; i < D[0].rows; i++) {
           std::cout << D[j](i, k) << "\t";
         }
@@ -47,8 +47,8 @@ int main() {
 
     for (int l = 0; l < H[0][0].cols; l++) {
       for (int k = 0; k < H[0][0].rows; k++) {
-        for (int j = 0; j < H.size(); j++) {
-          for (int i = 0; i < H[0].size(); i++) {
+        for (uint j = 0; j < H.size(); j++) {
+          for (uint i = 0; i < H[0].size(); i++) {
             std::cout << H[j][i](k, l) << "\t";
           }
           std::cout << "\n";

@@ -27,7 +27,7 @@ class BallsAndBinsTest : public testing::TestWithParam<std::tuple<int, int>>
   virtual void TearDown(){}
 };
 
-void checkOutput(const IndexMat2D& expected, const IndexMat2DArray& result, const int expectNum) {
+void checkOutput(const IndexMat2D& expected, const IndexMat2DArray& result, const uint expectNum) {
   EXPECT_EQ(result.size(), expectNum);
   EXPECT_TRUE(isIntMatrixEqual(result.back(), expected));
 }
