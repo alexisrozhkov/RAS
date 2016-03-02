@@ -1,11 +1,9 @@
-//
-// Created by alexey on 27.02.16.
-//
+// Copyright 2016 Alexey Rozhkov
 
-#ifndef RAS_FIND_POLYNOMIALS_H
-#define RAS_FIND_POLYNOMIALS_H
+#ifndef CORE_FIND_POLYNOMIALS_H_
+#define CORE_FIND_POLYNOMIALS_H_
 
-#include <ras_types.h>
+#include <utils/ras_types.h>
 
 
 enum class FindPolyMethod {
@@ -13,10 +11,9 @@ enum class FindPolyMethod {
   LLE
 };
 
-
 Mat2D find_polynomials(const Mat2D &data,
                        const Mat3D &derivative,
                        const FindPolyMethod method,
-                       const int charDimension=1);
+                       const int charDimension = 1);
 
-#endif //RAS_FIND_POLYNOMIALS_H
+#endif  // CORE_FIND_POLYNOMIALS_H_

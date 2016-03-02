@@ -1,14 +1,13 @@
-//
-// Created by alexey on 28.02.16.
-//
+// Copyright 2016 Alexey Rozhkov
 
-#ifndef RAS_GENERALIZED_EIGENVALUES_H
-#define RAS_GENERALIZED_EIGENVALUES_H
+#ifndef CORE_UTILS_GENERALIZED_EIGENVALUES_H_
+#define CORE_UTILS_GENERALIZED_EIGENVALUES_H_
 
-#include <ras_types.h>
+#include <utils/ras_types.h>
 
 // using Eigen and real generalized Schur decomposition under the hood
-// returns nominator and denominator for each eigenvalue (to be able to represent infinite eigenvalues to some extent)
-void generalizedEigenvals(const Mat2D &A, const Mat2D &B, Mat2D &al, Mat2D &be);
+// returns nominator and denominator for each eigenvalue
+// (to be able to represent infinite eigenvalues to some extent)
+void generalizedEigenvals(const Mat2D &A, const Mat2D &B, Mat2D *al, Mat2D *be);
 
-#endif //RAS_GENERALIZED_EIGENVALUES_H
+#endif  // CORE_UTILS_GENERALIZED_EIGENVALUES_H_

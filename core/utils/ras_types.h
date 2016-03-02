@@ -1,14 +1,13 @@
-//
-// Created by alexey on 28.02.16.
-//
+// Copyright 2016 Alexey Rozhkov
 
-#ifndef RAS_RAS_TYPES_H
-#define RAS_RAS_TYPES_H
+#ifndef CORE_UTILS_RAS_TYPES_H_
+#define CORE_UTILS_RAS_TYPES_H_
+
+#include <opencv2/core.hpp>
 
 #include <array>
 #include <vector>
 #include <ostream>
-#include <opencv2/core.hpp>
 
 
 typedef int IndValT;
@@ -36,4 +35,4 @@ typedef std::array<std::vector<EmbValT>, 3> EmbeddingInitializer;
 std::ostream &operator<<(std::ostream &os, Mat3D const &m);
 std::ostream &operator<<(std::ostream &os, Mat4D const &m);
 
-#endif //RAS_RAS_TYPES_H
+#endif  // CORE_UTILS_RAS_TYPES_H_

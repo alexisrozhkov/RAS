@@ -1,12 +1,10 @@
-//
-// Created by alexey on 22.02.16.
-//
+// Copyright 2016 Alexey Rozhkov
 
-#ifndef RAS_PERSPECTIVE_EMBEDDING_H
-#define RAS_PERSPECTIVE_EMBEDDING_H
+#ifndef CORE_PERSPECTIVE_EMBEDDING_H_
+#define CORE_PERSPECTIVE_EMBEDDING_H_
 
+#include <utils/ras_types.h>
 #include <ostream>
-#include <ras_types.h>
 
 
 class Embedding {
@@ -34,19 +32,35 @@ class Embedding {
   const Mat2DArray indicesFlt;
 
   // veronese mapping
-  inline void computeVeroneseMappingMat(Mat2D &out, const int o) const;
-  inline void computeVeroneseMappingCol(Mat2D &out, const int o, const int n) const;
-  inline void computeVeroneseMappingElem(Mat2D &out, const int o, const int n, const int k) const;
-  void computeVeroneseMapping(const int o, Mat2D &vOut) const;
+  inline void computeVeroneseMappingMat(Mat2D *out,
+                                        const int o) const;
+
+  inline void computeVeroneseMappingCol(Mat2D *out,
+                                        const int o,
+                                        const int n) const;
+
+  inline void computeVeroneseMappingElem(Mat2D *out,
+                                         const int o,
+                                         const int n,
+                                         const int k) const;
+
+  void computeVeroneseMapping(const int o, Mat2D *vOut) const;
 
   // derivative calculation
   template<typename T>
-  void calcDeriv(const int o, const int idx1, const int idx2, const T &Mat1, std::vector<T> &Mat2) const;
-  void swapMiddleNondiag(Mat4D &H, const int d, const int h) const;
-  void computeDerivatives(const int o, Mat3D &dOut, Mat4D &hOut) const;
+  void calcDeriv(const int o,
+                 const int idx1,
+                 const int idx2,
+                 const T *Mat1,
+                 std::vector<T>  // NOLINT(build/include_what_you_use)
+                 *Mat2) const;
+  void swapMiddleNondiag(Mat4D *H, const int d, const int h) const;
+  void computeDerivatives(const int o, Mat3D *dOut, Mat4D *hOut) const;
 
   // dimension filtering
-  IndexMat2D chooseDimensionsToKeep(const IndexMat2D &lastIndices, const int order, int &numKeepDimensionsOut) const;
+  IndexMat2D chooseDimensionsToKeep(const IndexMat2D &lastIndices,
+                                    const int order,
+                                    int *numKeepDimensionsOut) const;
   void filterDimensions(const IndexMat2D &indicesLast, const int order);
 
  public:
@@ -54,17 +68,17 @@ class Embedding {
 
   Embedding(const EmbeddingInitializer &init, const int N);
 
-  const Mat2DArray& getV() const;
-  const Mat3DArray& getD() const;
-  const Mat4DArray& getH() const;
+  const Mat2DArray &getV() const;
+  const Mat3DArray &getD() const;
+  const Mat4DArray &getH() const;
 };
 
 std::ostream &operator<<(std::ostream &os, Embedding const &e);
 
 const int Kconst = 5;
 
-Embedding perspective_embedding(const Mat2D& data,
+Embedding perspective_embedding(const Mat2D &data,
                                 const unsigned int order,
-                                const bool all=false);
+                                const bool all = false);
 
-#endif //RAS_PERSPECTIVE_EMBEDDING_H
+#endif   // CORE_PERSPECTIVE_EMBEDDING_H_
