@@ -2,7 +2,6 @@
 // Created by alexey on 27.02.16.
 //
 
-#include <iostream>
 #include <generalized_eigenvalues.h>
 
 #include "find_polynomials.h"
@@ -30,25 +29,32 @@ Mat2D find_polynomials(const Mat2D &data,
         }
       }
 
-      B += temp * temp.t();
+      Mat2D temp_ = temp * temp.t();
+      B += temp_;
     }
 
+    // according to the paper denominator should be regularized.
+    // but in the reference implementation nominator is.
+    // todo: check this more closely or maybe contact the author
     A += RAYLEIGHQUOTIENT_EPSILON*Mat2D::eye(veroneseDimension, veroneseDimension);
 
-    Mat2D al, be;
-    generalizedEigenvals(A, B, al, be);
-    // not sure if element-wise al/be ratios are sorted or not... todo: check
+    Mat2D alphas, betas;
+    generalizedEigenvals(A, B, alphas, betas);
+
+    // find eigenvalues from ratios and sort
+    // perhaps special care has to be taken for cases when beta ~ 0
+    std::vector<EmbValT> eigenvals((uint)alphas.rows);
+    for(int i = 0; i < alphas.rows; i++) {
+      eigenvals[i] = fabs(alphas(i))/fabs(betas(i));
+    }
+    std::sort(eigenvals.begin(), eigenvals.end());
+
     Mat2D out(veroneseDimension, charDimension);
-
     for(int i = 0; i < charDimension; i++) {
-      const EmbValT alpha = al(al.rows-1-i);
-      const EmbValT beta = be(be.rows-1-i);
-
       // given an eigenval, we can easily find corresponding eigenvector
-      // todo: check if we can multiply A by beta instead of dividing B
-      cv::SVD::solveZ(A - alpha*B/beta, out.col(i));
+      cv::SVD::solveZ(A - eigenvals[i]*B, out.col(i));
 
-      out.col(i) /= cv::norm(out.col(i));
+      // no need to normalize since cv::SVD::solveZ seeks for solution with norm = 1
     }
 
     return out;
