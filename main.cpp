@@ -34,7 +34,7 @@ int main() {
                           1.000000, 1.000000, 1.000000, 1.000000, 1.000000, 1.000000, 1.000000};
 
   auto e = perspective_embedding(Mat2D(5, 7, matchesData), 3);
-  auto p = find_polynomials(e.getV().back(), e.getD().back(), FISHER, 1);
+  auto p = find_polynomials(e.getV().back(), e.getD().back(), FindPolyMethod::FISHER, 1);
   std::cout << p << std::endl;
 
   return 0;

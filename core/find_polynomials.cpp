@@ -11,7 +11,7 @@ Mat2D find_polynomials(const Mat2D &data,
                        const Mat3D &derivative,
                        const FindPolyMethod method,
                        const int charDimension) {
-  if(method == FISHER) {
+  if(method == FindPolyMethod::FISHER) {
     const EmbValT RAYLEIGHQUOTIENT_EPSILON = 10;
 
     const int veroneseDimension = (uint)derivative.size(),

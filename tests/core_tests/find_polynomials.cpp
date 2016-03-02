@@ -38,7 +38,7 @@ TEST_P(FindPolynomialsTest, checkRes) {
   const Mat2D inputMat = Mat2D(inputRandom[sizeIdx]).reshape(0, Kconst);
 
   const auto e = perspective_embedding(inputMat, (uint)motionIdx+1);
-  const auto result = find_polynomials(e.getV().back(), e.getD().back(), FISHER, cols);
+  const auto result = find_polynomials(e.getV().back(), e.getD().back(), FindPolyMethod::FISHER, cols);
 
   EXPECT_EQ(result.size(), expected.size());
 

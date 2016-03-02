@@ -8,7 +8,7 @@
 #include <ras_types.h>
 
 
-enum FindPolyMethod {
+enum class FindPolyMethod {
   FISHER,
   LLE
 };
