@@ -1,11 +1,10 @@
-//
-// Created by alexey on 26.02.2016.
-//
+// Copyright 2016 Alexey Rozhkov
 
-#ifndef RAS_BALLS_AND_BINS_DATA_H
-#define RAS_BALLS_AND_BINS_DATA_H
+#ifndef TESTS_CORE_TESTS_BALLS_AND_BINS_DATA_H_
+#define TESTS_CORE_TESTS_BALLS_AND_BINS_DATA_H_
 
-#include <ras_types.h>
+#include <core/utils/ras_types.h>
+#include <vector>
 
 
 const std::vector<IndValT> expectedVals[3][3] = {
@@ -56,4 +55,4 @@ const std::vector<IndValT> expectedVals[3][3] = {
   }
 };
 
-#endif //RAS_BALLS_AND_BINS_DATA_H
+#endif  // TESTS_CORE_TESTS_BALLS_AND_BINS_DATA_H_

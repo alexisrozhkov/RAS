@@ -1,11 +1,10 @@
-//
-// Created by alexey on 27.02.16.
-//
+// Copyright 2016 Alexey Rozhkov
 
-#ifndef RAS_FIND_POLYNOMIALS_DATA_H
-#define RAS_FIND_POLYNOMIALS_DATA_H
+#ifndef TESTS_CORE_TESTS_FIND_POLYNOMIALS_DATA_H_
+#define TESTS_CORE_TESTS_FIND_POLYNOMIALS_DATA_H_
 
-#include <ras_types.h>
+#include <core/utils/ras_types.h>
+#include <vector>
 
 
 const std::vector<EmbValT> inputRandom[3] = {
@@ -186,5 +185,4 @@ const std::vector<EmbValT> expectedResult[2][3] = {
   }
 };
 
-
-#endif //RAS_FIND_POLYNOMIALS_DATA_H
+#endif  // TESTS_CORE_TESTS_FIND_POLYNOMIALS_DATA_H_

@@ -1,20 +1,21 @@
-//
-// Created by alexey on 26.02.2016.
-//
+// Copyright 2016 Alexey Rozhkov
 
-#ifndef RAS_PERSPECTIVE_EMBEDDING_DATA_H
-#define RAS_PERSPECTIVE_EMBEDDING_DATA_H
+#ifndef TESTS_CORE_TESTS_PERSPECTIVE_EMBEDDING_DATA_H_
+#define TESTS_CORE_TESTS_PERSPECTIVE_EMBEDDING_DATA_H_
 
-#include <ras_types.h>
+#include <core/utils/ras_types.h>
+#include <vector>
+
 
 const int N_offset = 1;
 
-// data for one motion case.
-// indices stand for:
+// data for one motion case. indices stand for:
 // presence of zero entries(0 - no, 1 - yes),
 // number of points (N = idx+N_offset) and
-// EmbeddingInitializer's underlying array index is for matrix type(0 - veronese, 1 - jacobian, 2 - hessian)
-// that means oneMotionExpected[0][1][2] is a precomputed hessian for N = 2 without zero entries
+// EmbeddingInitializer's underlying array index is for
+// matrix type (0 - veronese, 1 - jacobian, 2 - hessian)
+// that means oneMotionExpected[0][1][2] is a
+// precomputed hessian for N = 2 without zero entries
 
 // using double braces to initialize array's underlying aggregate like in:
 // http://stackoverflow.com/questions/6893700/how-to-construct-stdarray-object-with-initializer-list
@@ -433,7 +434,8 @@ const EmbeddingInitializer oneMotionExpected[2][2] = {
 }
 };
 
-// these are the inputs, for which above data was precomputed. indices have same meaning as for output
+// these are the inputs, for which above data was precomputed.
+// indices have same meaning as for output
 const std::vector<EmbValT> oneMotionInput[2][2] = {
   {
     {1,
@@ -465,7 +467,7 @@ const std::vector<EmbValT> oneMotionInput[2][2] = {
 };
 
 // data for case of two motions
-const std::vector<EmbValT> twoMotionsInput= {
+const std::vector<EmbValT> twoMotionsInput = {
   {
     0, 6,
     2, 0,
@@ -964,4 +966,4 @@ const EmbeddingInitializer twoMotionsExpected = {
   }}
 };
 
-#endif //RAS_PERSPECTIVE_EMBEDDING_DATA_H
+#endif  // TESTS_CORE_TESTS_PERSPECTIVE_EMBEDDING_DATA_H_

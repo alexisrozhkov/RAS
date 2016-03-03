@@ -1,6 +1,6 @@
 // Copyright 2016 Alexey Rozhkov
 
-#include <utils/balls_and_bins.h>
+#include <core/utils/balls_and_bins.h>
 
 
 IndexMat2DArray balls_and_bins(const unsigned int ballCount,

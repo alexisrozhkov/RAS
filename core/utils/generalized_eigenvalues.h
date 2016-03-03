@@ -3,7 +3,7 @@
 #ifndef CORE_UTILS_GENERALIZED_EIGENVALUES_H_
 #define CORE_UTILS_GENERALIZED_EIGENVALUES_H_
 
-#include <utils/ras_types.h>
+#include <core/utils/ras_types.h>
 
 // using Eigen and real generalized Schur decomposition under the hood
 // returns nominator and denominator for each eigenvalue

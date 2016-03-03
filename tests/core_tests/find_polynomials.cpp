@@ -1,20 +1,18 @@
-//
-// Created by alexey on 27.02.16.
-//
+// Copyright 2016 Alexey Rozhkov
 
+#include <tests/core_tests/find_polynomials_data.h>
+#include <tests/core_tests/utils/mat_equal_test.h>
+#include <core/perspective_embedding.h>
+#include <core/find_polynomials.h>
 #include <gtest/gtest.h>
-#include <mat_equal_test.h>
-#include <perspective_embedding.h>
-#include <find_polynomials.h>
-
-#include "find_polynomials_data.h"
+#include <tuple>
 
 
-class FindPolynomialsTest : public testing::TestWithParam<std::tuple<int, int>>
-{
+class FindPolynomialsTest : public
+                            testing::TestWithParam<std::tuple<int, int>> {
  public:
-  virtual void SetUp(){}
-  virtual void TearDown(){}
+  virtual void SetUp() {}
+  virtual void TearDown() {}
 };
 
 INSTANTIATE_TEST_CASE_P(First32Arguments,
@@ -32,21 +30,26 @@ TEST_P(FindPolynomialsTest, checkRes) {
   const auto expectedVec = expectedResult[motionIdx][sizeIdx];
 
   const int cols = 1;
-  const int rows = int(expectedVec.size())/cols;
+  const int rows = static_cast<int>(expectedVec.size())/cols;
 
   const Mat2D expected = Mat2D(expectedVec).reshape(0, rows);
   const Mat2D inputMat = Mat2D(inputRandom[sizeIdx]).reshape(0, Kconst);
 
   const auto e = perspective_embedding(inputMat, (uint)motionIdx+1);
-  const auto result = find_polynomials(e.getV().back(), e.getD().back(), FindPolyMethod::FISHER, cols);
+
+  const auto result = find_polynomials(e.getV().back(),
+                                       e.getD().back(),
+                                       FindPolyMethod::FISHER,
+                                       cols);
 
   EXPECT_EQ(result.size(), expected.size());
 
   // handle the eigenvec 'sign' ambiguity
-  for(int i = 0; i < result.cols; i++) {
+  for (int i = 0; i < result.cols; i++) {
     int sign = sgn(expected(0, i)) == sgn(result(0, i)) ? 1 : -1;
 
-    // bigger epsilon since the mantissa in expected result is specified only up to 6th digit
+    // bigger epsilon since the mantissa in expected result is
+    // specified only up to 6th digit
     EXPECT_TRUE(isDblMatrixEqual(sign*result.col(i), expected.col(i), 1e-5));
   }
 }

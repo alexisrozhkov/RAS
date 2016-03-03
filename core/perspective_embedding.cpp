@@ -1,7 +1,7 @@
 // Copyright 2016 Alexey Rozhkov
 
-#include <utils/balls_and_bins.h>
-#include <perspective_embedding.h>
+#include <core/utils/balls_and_bins.h>
+#include <core/perspective_embedding.h>
 
 
 // utilities

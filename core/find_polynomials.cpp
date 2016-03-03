@@ -1,7 +1,8 @@
 // Copyright 2016 Alexey Rozhkov
 
-#include <utils/generalized_eigenvalues.h>
-#include <find_polynomials.h>
+#include <core/utils/generalized_eigenvalues.h>
+#include <core/find_polynomials.h>
+#include <vector>
 
 
 Mat2D find_polynomials(const Mat2D &data,
@@ -27,8 +28,7 @@ Mat2D find_polynomials(const Mat2D &data,
         }
       }
 
-      Mat2D temp_ = temp * temp.t();
-      B += temp_;
+      B += temp * temp.t();
     }
 
     // according to the paper denominator should be regularized.
@@ -42,8 +42,7 @@ Mat2D find_polynomials(const Mat2D &data,
 
     // find eigenvalues from ratios and sort
     // perhaps special care has to be taken for cases when beta ~ 0
-    std::vector<EmbValT>  // NOLINT(build/include_what_you_use)
-        eigenvals((uint) alphas.rows);
+    std::vector<EmbValT>  eigenvals((uint) alphas.rows);
 
     for (int i = 0; i < alphas.rows; i++) {
       eigenvals[i] = fabs(alphas(i)) / fabs(betas(i));

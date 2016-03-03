@@ -1,9 +1,9 @@
 // Copyright 2016 Alexey Rozhkov
 
-#include <Eigen/Eigenvalues>
+#include <3rdparty/Eigen/Eigenvalues>
 #include <opencv2/core/eigen.hpp>
 
-#include <utils/generalized_eigenvalues.h>
+#include <core/utils/generalized_eigenvalues.h>
 
 
 void generalizedEigenvals(const Mat2D &A,

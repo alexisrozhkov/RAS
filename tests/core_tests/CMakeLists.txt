@@ -1,8 +1,6 @@
 include_directories(${gtest_SOURCE_DIR}/include
                     ${gtest_SOURCE_DIR}
-                    ../../core
-                    ../../core/utils
-                    utils)
+                    ../..)
 
 add_executable(runCoreTests
                utils/mat_equal_test.cpp
@@ -10,4 +8,7 @@ add_executable(runCoreTests
                perspective_embedding.cpp
                find_polynomials.cpp)
 
-target_link_libraries(runCoreTests gtest gtest_main RAS)
+target_link_libraries(runCoreTests
+                      gtest
+                      gtest_main
+                      RAS)

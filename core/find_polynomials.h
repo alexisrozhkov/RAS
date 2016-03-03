@@ -3,7 +3,7 @@
 #ifndef CORE_FIND_POLYNOMIALS_H_
 #define CORE_FIND_POLYNOMIALS_H_
 
-#include <utils/ras_types.h>
+#include <core/utils/ras_types.h>
 
 
 enum class FindPolyMethod {

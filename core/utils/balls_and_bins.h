@@ -3,7 +3,7 @@
 #ifndef CORE_UTILS_BALLS_AND_BINS_H_
 #define CORE_UTILS_BALLS_AND_BINS_H_
 
-#include <utils/ras_types.h>
+#include <core/utils/ras_types.h>
 
 
 // Enumerates all possible groupings of identical objects, i.e. balls in bins.

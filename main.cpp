@@ -1,8 +1,8 @@
-#include <iostream>
-#include <perspective_embedding.h>
-#include <find_polynomials.h>
+// Copyright 2016 Alexey Rozhkov
 
-using namespace std;
+#include <core/perspective_embedding.h>
+#include <core/find_polynomials.h>
+#include <iostream>
 
 // Matlab-friendly notation for testing
 
@@ -27,14 +27,20 @@ matchesData = [0.088945, 0.433042, 0.926859, 0.735854, 0.977486, 0.633038, 0.357
 */
 
 int main() {
-  double matchesData[] = {0.088945, 0.433042, 0.926859, 0.735854, 0.977486, 0.633038, 0.357806,
-                          0.726031, 0.856072, 0.281373, 0.997820, 0.998505, 0.784976, 0.293788,
-                          0.935457, 0.988242, 0.810612, 0.184758, 0.966597, 0.610093, 0.202951,
-                          0.327750, 0.290207, 0.043002, 0.994514, 0.450264, 0.730404, 0.934064,
-                          1.000000, 1.000000, 1.000000, 1.000000, 1.000000, 1.000000, 1.000000};
+  double matchesData[] = {
+      0.088945, 0.433042, 0.926859, 0.735854, 0.977486, 0.633038, 0.357806,
+      0.726031, 0.856072, 0.281373, 0.997820, 0.998505, 0.784976, 0.293788,
+      0.935457, 0.988242, 0.810612, 0.184758, 0.966597, 0.610093, 0.202951,
+      0.327750, 0.290207, 0.043002, 0.994514, 0.450264, 0.730404, 0.934064,
+      1.000000, 1.000000, 1.000000, 1.000000, 1.000000, 1.000000, 1.000000
+  };
 
   auto e = perspective_embedding(Mat2D(5, 7, matchesData), 3);
-  auto p = find_polynomials(e.getV().back(), e.getD().back(), FindPolyMethod::FISHER, 1);
+
+  auto p = find_polynomials(e.getV().back(),
+                            e.getD().back(),
+                            FindPolyMethod::FISHER);
+
   std::cout << p << std::endl;
 
   return 0;

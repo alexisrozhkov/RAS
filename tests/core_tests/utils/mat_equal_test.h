@@ -1,15 +1,17 @@
-//
-// Created by alexey on 27.02.16.
-//
+// Copyright 2016 Alexey Rozhkov
 
-#ifndef RAS_MAT_EQUAL_TEST_H
-#define RAS_MAT_EQUAL_TEST_H
+#ifndef TESTS_CORE_TESTS_UTILS_MAT_EQUAL_TEST_H_
+#define TESTS_CORE_TESTS_UTILS_MAT_EQUAL_TEST_H_
 
+#include <core/utils/ras_types.h>
 #include <gtest/gtest.h>
-#include <ras_types.h>
 
 
-testing::AssertionResult isIntMatrixEqual(const IndexMat2D &a, const IndexMat2D &b);
-testing::AssertionResult isDblMatrixEqual(const Mat2D &a, const Mat2D &b, const EmbValT epsilon=1e-10);
+testing::AssertionResult isIntMatrixEqual(const IndexMat2D &a,
+                                          const IndexMat2D &b);
 
-#endif //RAS_MAT_EQUAL_TEST_H
+testing::AssertionResult isDblMatrixEqual(const Mat2D &a,
+                                          const Mat2D &b,
+                                          const EmbValT epsilon = 1e-10);
+
+#endif  // TESTS_CORE_TESTS_UTILS_MAT_EQUAL_TEST_H_
