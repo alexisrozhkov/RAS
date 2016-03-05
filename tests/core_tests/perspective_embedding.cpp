@@ -57,7 +57,8 @@ TEST_P(PerspectiveEmbeddingTest, check1Motion) {
 
   const int Nidx = N-N_offset;
 
-  const Mat2D input = Mat2D(oneMotionInput[hasZeros][Nidx]).reshape(0, Kconst);
+  const Mat2D input = Mat2D(oneMotionInput[hasZeros][Nidx],
+                            true).reshape(0, Kconst);
 
   checkEmbeddingEqual(perspective_embedding(input, O),
                       Embedding(oneMotionExpected[hasZeros][Nidx], N));
@@ -66,7 +67,7 @@ TEST_P(PerspectiveEmbeddingTest, check1Motion) {
 TEST(PerspectiveEmbeddingTest, check2Motions) {
   const int N = 2, O = 2;
 
-  const Mat2D input = Mat2D(twoMotionsInput).reshape(0, Kconst);
+  const Mat2D input = Mat2D(twoMotionsInput, true).reshape(0, Kconst);
 
   checkEmbeddingEqual(perspective_embedding(input, O),
                       Embedding(twoMotionsExpected, N));

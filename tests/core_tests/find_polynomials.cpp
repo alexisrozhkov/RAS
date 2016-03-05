@@ -32,8 +32,8 @@ TEST_P(FindPolynomialsTest, checkRes) {
   const int cols = 1;
   const int rows = static_cast<int>(expectedVec.size())/cols;
 
-  const Mat2D expected = Mat2D(expectedVec).reshape(0, rows);
-  const Mat2D inputMat = Mat2D(inputRandom[sizeIdx]).reshape(0, Kconst);
+  const Mat2D expected = Mat2D(expectedVec, true).reshape(0, rows);
+  const Mat2D inputMat = Mat2D(inputRandom[sizeIdx], true).reshape(0, Kconst);
 
   const auto e = perspective_embedding(inputMat, (uint)motionIdx+1);
 

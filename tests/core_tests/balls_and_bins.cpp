@@ -7,16 +7,15 @@
 #include <tuple>
 
 
-cv::Mat1i getExpectedMat(const int balls, const int bins) {
+IndexMat2D getExpectedMat(const int balls, const int bins) {
   assert(balls >= 1 && balls <= 3);
   assert(bins >= 1 && bins <= 3);
 
   auto expectedVec = expectedVals[balls - 1][bins - 1];
   int rows = static_cast<int>(expectedVec.size()) / bins;
 
-  // todo: check why this transpose is needed
-  IndexMat2D expectMat = IndexMat2D(expectedVec).t();
-  return expectMat.reshape(0, rows);
+  IndexMat2D expectMat = IndexMat2D(expectedVec, true).reshape(0, rows);
+  return expectMat;
 }
 
 class BallsAndBinsTest: public testing::TestWithParam<std::tuple<int, int>> {
