@@ -94,18 +94,18 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
       // Reject outliers by the sample influence function
       Mat2D influenceValues = Mat2D::zeros(1, sampleCount);
 
-      /*
-      for(int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+      for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
         // compute the leave-one-out influence
-        auto U = find_polynomials(veroneseData(:,[1:sampleIndex-1 sampleIndex+1:sampleCount]),
-                                  veroneseDerivative(:,:,[1:sampleIndex-1 sampleIndex+1:sampleCount]),
+        auto U = find_polynomials(veroneseData,
+                                  veroneseDerivative,
                                   FITTING_METHOD,
-                                  1);
-        influenceValues(sampleIndex) = subspace_angle(polynomialCoefficients, U);
+                                  1,
+                                  sampleIndex);
+
+        std::cout << U << std::endl << std::endl;
       }
-       */
     }
   }
 
-  return jointImageData;
+  return veroneseData;
 }

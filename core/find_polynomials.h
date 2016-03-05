@@ -15,6 +15,7 @@ enum class FindPolyMethod {
 Mat2D find_polynomials(const Mat2D &data,
                        const Mat3D &derivative,
                        const FindPolyMethod method,
-                       const int charDimension = 1);
+                       const int charDimension = 1,
+                       const int ignoreSample = -1);
 
 #endif  // CORE_FIND_POLYNOMIALS_H_
