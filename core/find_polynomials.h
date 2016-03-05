@@ -11,6 +11,7 @@ enum class FindPolyMethod {
   LLE
 };
 
+// todo: add tests
 Mat2D find_polynomials(const Mat2D &data,
                        const Mat3D &derivative,
                        const FindPolyMethod method,

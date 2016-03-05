@@ -16,7 +16,7 @@ enum class InfluenceMethod {
 // 2-view perspective dynamic scene using Robust Algebraic Segmentation
 Mat2D robust_algebraic_segmentation(const Mat2D &img1,
                                     const Mat2D &img2,
-                                    const int groupCount,
+                                    const unsigned int groupCount,
 
                                     const int debug = 0,
                                     const bool postRansac = true,

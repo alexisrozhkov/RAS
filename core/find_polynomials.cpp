@@ -42,7 +42,7 @@ Mat2D find_polynomials(const Mat2D &data,
 
     // find eigenvalues from ratios and sort
     // perhaps special care has to be taken for cases when beta ~ 0
-    std::vector<EmbValT>  eigenvals((uint) alphas.rows);
+    std::vector<EmbValT> eigenvals((uint) alphas.rows);
 
     for (int i = 0; i < alphas.rows; i++) {
       eigenvals[i] = fabs(alphas(i)) / fabs(betas(i));

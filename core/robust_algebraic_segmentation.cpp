@@ -1,12 +1,14 @@
 // Copyright 2016 Alexey Rozhkov
 
 #include <core/robust_algebraic_segmentation.h>
-#include <core/find_polynomials.h>
+#include <core/perspective_embedding.h>
+#include <core/utils/cholesky.h>
+#include <iostream>
 
 
 Mat2D robust_algebraic_segmentation(const Mat2D &img1,
                                     const Mat2D &img2,
-                                    const int groupCount,
+                                    const unsigned int groupCount,
 
                                     const int debug,
                                     const bool postRansac,
@@ -19,6 +21,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
                                     const EmbValT minOutlierPercentage,
                                     const EmbValT maxOutlierPercentage,
                                     const bool retestOutliers) {
+  //////////////////////////////////////////////////////////////////////////////
   // parse arguments (currently as close as possible to Matlab, should be
   // refactored later
   const int DEBUG = debug;
@@ -48,5 +51,61 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
 
   const bool RETEST_OUTLIERS = retestOutliers;
 
-  return Mat2D();
+  //////////////////////////////////////////////////////////////////////////////
+  // Step 1: map coordinates to joint image space.
+  const int sampleCount = img1.cols;
+  const int dimensionCount = 5;
+  Mat2D jointImageData = Mat2D::zeros(dimensionCount, sampleCount);
+
+  if (NORMALIZE_DATA) {
+    Mat2D img1_, img2_, temp;
+    cv::vconcat(img1, Mat2D::ones(1, sampleCount), img1_);
+    cv::vconcat(img2, Mat2D::ones(1, sampleCount), img2_);
+
+    temp = Cholesky((img1_*img1_.t()/sampleCount).inv())*img1_;
+    temp.rowRange(0, 2).copyTo(jointImageData.rowRange(0, 2));
+
+    temp = Cholesky((img2_*img2_.t()/sampleCount).inv())*img2_;
+    temp.rowRange(0, 2).copyTo(jointImageData.rowRange(2, 4));
+  } else {
+    img1.copyTo(jointImageData.rowRange(0, 2));
+    img2.copyTo(jointImageData.rowRange(2, 4));
+  }
+
+  jointImageData.row(4) = Mat2D::ones(1, sampleCount);
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Step 2: apply perspective veronese map to data
+  auto embedding = perspective_embedding(jointImageData, groupCount, false);
+  auto veroneseData = embedding.getV().back();
+  auto veroneseDerivative = embedding.getD().back();
+  auto veroneseHessian = embedding.getH().back();
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Step 3: Use influence function to perform robust pca
+
+  if (REJECT_KNOWN_OUTLIERS || REJECT_UNKNOWN_OUTLIERS) {
+    if (INFLUENCE_METHOD == InfluenceMethod::SAMPLE) {
+      auto polynomialCoefficients = find_polynomials(veroneseData,
+                                                     veroneseDerivative,
+                                                     FITTING_METHOD,
+                                                     1);
+
+      // Reject outliers by the sample influence function
+      Mat2D influenceValues = Mat2D::zeros(1, sampleCount);
+
+      /*
+      for(int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+        // compute the leave-one-out influence
+        auto U = find_polynomials(veroneseData(:,[1:sampleIndex-1 sampleIndex+1:sampleCount]),
+                                  veroneseDerivative(:,:,[1:sampleIndex-1 sampleIndex+1:sampleCount]),
+                                  FITTING_METHOD,
+                                  1);
+        influenceValues(sampleIndex) = subspace_angle(polynomialCoefficients, U);
+      }
+       */
+    }
+  }
+
+  return jointImageData;
 }

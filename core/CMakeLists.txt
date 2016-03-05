@@ -11,6 +11,7 @@ add_library(RAS STATIC
             utils/ras_types.cpp
             utils/balls_and_bins.cpp
             utils/generalized_eigenvalues.cpp
+            utils/cholesky.cpp
             perspective_embedding.cpp
             find_polynomials.cpp
             robust_algebraic_segmentation.cpp)
