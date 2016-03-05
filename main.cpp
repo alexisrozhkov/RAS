@@ -25,7 +25,7 @@ int main() {
 
   auto p = robust_algebraic_segmentation(mat1, mat2, 1);
 
-  std::cout << p << std::endl;
+  // std::cout << p << std::endl;
 
   return 0;
 }
