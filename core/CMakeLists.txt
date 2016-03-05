@@ -12,6 +12,7 @@ add_library(RAS STATIC
             utils/balls_and_bins.cpp
             utils/generalized_eigenvalues.cpp
             perspective_embedding.cpp
-            find_polynomials.cpp)
+            find_polynomials.cpp
+            robust_algebraic_segmentation.cpp)
 
 target_link_libraries(RAS ${OpenCV_LIBS})
