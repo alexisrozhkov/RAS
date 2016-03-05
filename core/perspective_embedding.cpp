@@ -2,6 +2,7 @@
 
 #include <core/utils/balls_and_bins.h>
 #include <core/perspective_embedding.h>
+#include <limits>
 
 
 // utilities
@@ -30,30 +31,29 @@ Mat4D Mat4D_zeros(const int A,
   return temp;
 }
 
-IndexMat2D findZeroCols(const Mat2D &data) {
-  IndexMat2D zeroData = IndexMat2D::zeros(data.cols, 1);
+IndexMat2D findNonPositiveCols(const Mat2D &data) {
+  IndexMat2D nonPositive = IndexMat2D::zeros(data.cols, 1);
 
   for (int i = 0; i < data.cols; i++) {
     for (int j = 0; j < data.rows; j++) {
-      // todo: maybe replace exact comparison with some epsilon
-      zeroData(i) += data(j, i) == 0;
+      nonPositive(i) += data(j, i) <= std::numeric_limits<EmbValT>::epsilon();
     }
   }
 
-  return zeroData;
+  return nonPositive;
 }
 
-bool checkZeros(const Mat2D &data) {
-  bool hasZeros = false;
+bool checkNonPositiveVals(const Mat2D &nonZeroCols) {
+  bool hasNonPositiveVals = false;
 
-  for (int i = 0; i < data.rows; i++) {
-    if (data(i) > 0) {
-      hasZeros = true;
+  for (int i = 0; i < nonZeroCols.rows; i++) {
+    if (nonZeroCols(i) > 0) {
+      hasNonPositiveVals = true;
       break;
     }
   }
 
-  return hasZeros;
+  return hasNonPositiveVals;
 }
 
 inline Mat2D matLog(const Mat2D &mat) {
@@ -102,14 +102,13 @@ void Embedding::computeVeroneseMapping(const int o, Mat2D *vOut) const {
   *vOut = Mat2D::zeros(dims, N);
 
   // Trick to compute the Veronese map using matrix multiplication
-  if (!hasZeros) {
-    // No exact 0 element in the data, log(Data) is finite, with possible
-    // complex terms when the data value is negative
+  if (!hasNonPositiveVals) {
+    // Only positive elements in the data, log(Data) is finite
     computeVeroneseMappingMat(vOut, o);
   } else {
     for (int n = 0; n < N; n++) {
-      if (zeroCols(n) > 0) {
-        // data(n) has 0 elements that are left unprocessed above.
+      if (nonPositiveCols(n) > 0) {
+        // we have non-positive elements that are left unprocessed above.
         for (int k = 0; k < dims; k++) {
           computeVeroneseMappingElem(vOut, o, n, k);
         }
@@ -262,8 +261,8 @@ Embedding::Embedding(const Mat2D &data_,
 
     data(data_),
     logData(matLog(data_)),
-    zeroCols(findZeroCols(data_)),
-    hasZeros(checkZeros(zeroCols)),
+    nonPositiveCols(findNonPositiveCols(data_)),
+    hasNonPositiveVals(checkNonPositiveVals(nonPositiveCols)),
 
     indices(balls_and_bins(2 * order, (uint) K, true)),
     indicesFlt(mat2dToFloat(indices)) {
@@ -278,7 +277,7 @@ Embedding::Embedding(const Mat2D &data_,
 Embedding::Embedding(const EmbeddingInitializer &init, const int N_) :
     K(Kconst),
     N(N_),
-    hasZeros(false) {  // true of false doesn't matter here
+    hasNonPositiveVals(false) {  // true of false doesn't matter here
   const int dims = static_cast<int>(init[0].size()) / N;
 
   Mat2D V = Mat2D(init[0]).reshape(0, dims);

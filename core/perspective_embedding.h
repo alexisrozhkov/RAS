@@ -5,6 +5,7 @@
 
 #include <core/utils/ras_types.h>
 #include <ostream>
+#include <vector>
 
 
 class Embedding {
@@ -19,11 +20,11 @@ class Embedding {
   // copy of data and it's element-wise logarithm
   const Mat2D data, logData;
 
-  // indicates whether there are zeros in each column of data
-  const IndexMat2D zeroCols;
+  // indicates whether there are non-positive values in each column of data
+  const IndexMat2D nonPositiveCols;
 
-  // indicates whether there are any zero entries in data
-  const bool hasZeros;
+  // indicates whether there are any non-positive entries in data
+  const bool hasNonPositiveVals;
 
   // the exponents of the veronese map
   const IndexMat2DArray indices;
@@ -52,8 +53,7 @@ class Embedding {
                  const int idx1,
                  const int idx2,
                  const T *Mat1,
-                 std::vector<T>  // NOLINT(build/include_what_you_use)
-                 *Mat2) const;
+                 std::vector<T> *Mat2) const;
   void swapMiddleNondiag(Mat4D *H, const int d, const int h) const;
   void computeDerivatives(const int o, Mat3D *dOut, Mat4D *hOut) const;
 
