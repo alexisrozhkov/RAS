@@ -1,6 +1,6 @@
 include_directories(${gtest_SOURCE_DIR}/include
                     ${gtest_SOURCE_DIR}
-                    ../..)
+                    ${PROJECT_SOURCE_DIR})
 
 add_executable(runCoreTests
                utils/mat_equal_test.cpp

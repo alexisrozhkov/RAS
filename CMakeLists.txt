@@ -7,7 +7,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated")
 add_subdirectory(core)
 add_subdirectory(tests)
 
-include_directories(.)
+include_directories(${PROJECT_SOURCE_DIR})
 
 add_executable(runRAS main.cpp)
 
