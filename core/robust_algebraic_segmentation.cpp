@@ -3,6 +3,7 @@
 #include <core/robust_algebraic_segmentation.h>
 #include <core/perspective_embedding.h>
 #include <core/utils/cholesky.h>
+#include <core/utils/subspace_angle.h>
 #include <iostream>
 
 
@@ -94,16 +95,20 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
       // Reject outliers by the sample influence function
       Mat2D influenceValues = Mat2D::zeros(1, sampleCount);
 
-      for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+      for (int sIdx = 0; sIdx < sampleCount; sIdx++) {
         // compute the leave-one-out influence
         auto U = find_polynomials(veroneseData,
                                   veroneseDerivative,
                                   FITTING_METHOD,
                                   1,
-                                  sampleIndex);
+                                  sIdx);
 
-        std::cout << U << std::endl << std::endl;
+        influenceValues(sIdx) = subspace_angle(polynomialCoefficients, U);
       }
+
+      std::cout << influenceValues << std::endl;
+    } else {
+      // todo
     }
   }
 
