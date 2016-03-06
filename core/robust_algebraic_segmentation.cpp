@@ -84,6 +84,23 @@ Mat2D sliceIdx3(const Mat3D &src, const int idx) {
   return temp;
 }
 
+Mat2D meanIdx3(const Mat3D &src) {
+  Mat2D temp(static_cast<int>(src.size()), src[0].rows);
+
+  for (int j = 0; j < static_cast<int>(src.size()); j++) {
+    for (int i = 0; i < src[0].rows; i++) {
+      EmbValT sm = 0;
+      for (int k = 0; k < src[0].cols; k++) {
+        sm += src[j](i, k);
+      }
+
+      temp(j, i) = sm/src[0].cols;
+    }
+  }
+
+  return temp;
+}
+
 Mat2D sliceIdx23(const Mat4D &src, const int idx1, const int idx2) {
   Mat2D temp(static_cast<int>(src.size()), src[0][0].cols);
 
@@ -175,6 +192,30 @@ bool chooseRUO(const EmbValT boundaryThreshold,
   }
 
   return defaultVal;
+}
+
+Mat3D polyHessian(const int dimensionCount,
+                  const int samplesCount,
+                  const Mat2D &coeffs,
+                  const Mat4D &hessian) {
+  // todo: use Mat3d_zeros here
+  Mat3D hpn(static_cast<size_t>(dimensionCount));
+
+  for (int i = 0; i < dimensionCount; i++) {
+    hpn[i] = Mat2D(dimensionCount, samplesCount);
+  }
+
+  for (int eIdx1 = 0; eIdx1 < dimensionCount; eIdx1++) {
+    for (int eIdx2 = eIdx1; eIdx2 < dimensionCount; eIdx2++) {
+      hpn[eIdx1].row(eIdx2) = coeffs.t() * sliceIdx23(hessian, eIdx1, eIdx2);
+
+      if (eIdx1 != eIdx2) {
+        hpn[eIdx1].row(eIdx2).copyTo(hpn[eIdx2].row(eIdx1));
+      }
+    }
+  }
+
+  return hpn;
 }
 
 Mat2D robust_algebraic_segmentation(const Mat2D &img1,
@@ -274,7 +315,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
                                                      1);
 
       // Reject outliers by the sample influence function
-      for (int sIdx = 0; sIdx < sampleCount; sIdx++) {
+      for (int sIdx = 0; sIdx < static_cast<int>(sampleCount); sIdx++) {
         // compute the leave-one-out influence
         auto U = find_polynomials(veroneseData, veroneseDerivative,
                                   FITTING_METHOD, 1, sIdx);
@@ -326,7 +367,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
       sampleCount = static_cast<size_t>(floor(untrimmedSampleCount *
                                        (1 - outlierPercentage)));
 
-      for (int i = 0; i < sampleCount; i++) {
+      for (size_t i = 0; i < sampleCount; i++) {
         inlierIndices[i] = sortedIndex[sampleCount - 1 - i].second;
       }
       inlierIndices.resize(sampleCount);
@@ -358,7 +399,8 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
     if (REJECT_UNKNOWN_OUTLIERS) {
       distanceStack[outlierIndex] = 0;
 
-      for (int inlierIndex = 0; inlierIndex < sampleCount; inlierIndex++) {
+      for (int inlierIndex = 0; inlierIndex < static_cast<int>(sampleCount);
+           inlierIndex++) {
         Mat2D prod = polynomialCoefficients.t() * veroneseData.col(inlierIndex);
         EmbValT sampsonDistance = fabs(prod(0)) /
             norm(polynomialNormals.col(inlierIndex));
@@ -381,24 +423,10 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
 
   const int dimensionCount = 5;
 
-  // todo: use Mat3D_zeros here
-  Mat3D polynomialHessians(dimensionCount);
-  for (int eIdx1 = 0; eIdx1 < dimensionCount; eIdx1++) {
-    polynomialHessians[eIdx1] = Mat2D(dimensionCount,
-                                      static_cast<int>(sampleCount));
-  }
-
-  for (int eIdx1 = 0; eIdx1 < dimensionCount; eIdx1++) {
-    for (int eIdx2 = eIdx1; eIdx2 < dimensionCount; eIdx2++) {
-      polynomialHessians[eIdx1].row(eIdx2) = polynomialCoefficients.t() *
-          sliceIdx23(veroneseHessian, eIdx1, eIdx2);
-
-      if (eIdx1 != eIdx2) {
-        polynomialHessians[eIdx1].row(eIdx2).copyTo(
-            polynomialHessians[eIdx2].row(eIdx1));
-      }
-    }
-  }
+  Mat3D polynomialHessians = polyHessian(dimensionCount,
+                                         static_cast<int>(sampleCount),
+                                         polynomialCoefficients,
+                                         veroneseHessian);
 
   //////////////////////////////////////////////////////////////////////////////
   // Step 6: Compute Tangent Spaces and Mutual Contractions. Use Mutual
@@ -444,7 +472,8 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
   clusterPrototype(0) = 0;
   EmbValT cosTolerance = cos(angleTolerance);
 
-  for (int sampleIdx = 1; sampleIdx < sampleCount; sampleIdx++) {
+  for (int sampleIdx = 1; sampleIdx < static_cast<int>(sampleCount);
+       sampleIdx++) {
     for (int clusterIdx = 0; clusterIdx < clusterCount; clusterIdx++) {
       std::vector<int> indices {sampleIdx, clusterPrototype(clusterIdx)};
 
@@ -477,7 +506,54 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
     }
   }
 
-  std::cout << labels << std::endl;
+  //////////////////////////////////////////////////////////////////////////////
+  // Step 7: Recover quadratic matrices for each cluster.
+
+  if (clusterCount < static_cast<int>(groupCount)) {
+    std::runtime_error("Too few motion models found. "\
+                       "Please choose a smaller angleTolerance");
+  }
+
+  // todo: use Mat3d_zeros here
+  Mat3D quadratics(dimensionCount);
+
+  for (int i = 0; i < dimensionCount; i++) {
+    quadratics[i] = Mat2D(dimensionCount, clusterCount);
+  }
+
+  for (int clusterIndex = 0; clusterIndex < clusterCount; clusterIndex++) {
+    std::vector<int> currIndices;
+    for (int i = 0; i < labels.cols; i++) {
+      if (labels(i) == clusterIndex) {
+        currIndices.push_back(i);
+      }
+    }
+
+    int clusterSize = static_cast<int>(currIndices.size());
+    auto clusterData = filterIdx2(embeddedData, currIndices);
+    auto clusterHessian = filterIdx4(HembeddedData, currIndices);
+
+    Mat2D U;
+    jacobiSVD_U(clusterData, &U);
+
+    Mat3D hpn = polyHessian(dimensionCount,
+                            clusterSize,
+                            U.col(U.cols-1),
+                            clusterHessian);
+
+    auto quad = meanIdx3(hpn);
+    if (NORMALIZE_QUADRATICS) {
+      quad /= cv::norm(quad);
+    }
+
+    for (int j = 0; j < dimensionCount; j++) {
+      for (int i = 0; i < dimensionCount; i++) {
+        quadratics[j](i, clusterIndex) = quad(j, i);
+      }
+    }
+  }
+
+  std::cout << quadratics << std::endl;
 
   return veroneseData;
 }
