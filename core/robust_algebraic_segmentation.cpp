@@ -99,20 +99,74 @@ Mat2D mapPerspective(const Mat2D &img1,
   return jointImageData;
 }
 
+EmbValT chooseMinOutlierPercentage(const EmbValT minOutlierPercentage,
+                                   const EmbValT maxOutlierPercentage) {
+  const EmbValT defaultVal = 0;
+
+  if (minOutlierPercentage == NotSpecified) {  // nothing given
+    return defaultVal;
+  } else {  // one or two values given
+    return minOutlierPercentage;
+  }
+}
+
+EmbValT chooseMaxOutlierPercentage(const EmbValT minOutlierPercentage,
+                                   const EmbValT maxOutlierPercentage) {
+  const EmbValT defaultVal = 0.5;
+
+  if (minOutlierPercentage == NotSpecified) {  // nothing given
+    return defaultVal;
+  } else if (maxOutlierPercentage == NotSpecified) {  // one value given
+    return minOutlierPercentage;
+  } else {
+    return maxOutlierPercentage;  // range given
+  }
+}
+
+bool chooseRKO(const EmbValT minOutlierPercentage,
+               const EmbValT maxOutlierPercentage) {
+  const bool defaultVal = false;
+
+  if ((minOutlierPercentage > 0) &&
+      (maxOutlierPercentage == NotSpecified)) {
+      return true;  // one value given and its positive
+  }
+
+  return defaultVal;
+}
+
+bool chooseRUO(const EmbValT boundaryThreshold,
+               const EmbValT minOutlierPercentage,
+               const EmbValT maxOutlierPercentage) {
+  const bool defaultVal = false;
+
+  if (boundaryThreshold != NotSpecified) {
+    return true;  // boundary threshold specified
+  }
+
+  if ((minOutlierPercentage != NotSpecified) &&
+      (maxOutlierPercentage != NotSpecified)) {
+    return true;  // outlier range specified
+  }
+
+  return defaultVal;
+}
+
 Mat2D robust_algebraic_segmentation(const Mat2D &img1,
                                     const Mat2D &img2,
                                     const unsigned int groupCount,
 
+                                    const EmbValT boundaryThreshold_,
+                                    const EmbValT minOutlierPercentage_,
+                                    const EmbValT maxOutlierPercentage_,
+
                                     const int debug,
                                     const bool postRansac,
                                     const EmbValT angleTolerance,
-                                    const EmbValT boundaryThreshold,
                                     const FindPolyMethod fittingMethod,
                                     const InfluenceMethod influenceMethod,
                                     const bool normalizeCoordinates,
                                     const bool normalizeQuadratics,
-                                    const EmbValT minOutlierPercentage,
-                                    const EmbValT maxOutlierPercentage,
                                     const bool retestOutliers) {
   //////////////////////////////////////////////////////////////////////////////
   // parse arguments (currently as close as possible to Matlab, should be
@@ -121,10 +175,14 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
   const bool POST_RANSAC = postRansac;
 
   CV_Assert(!(angleTolerance < 0 || angleTolerance >= CV_PI / 2));
-  CV_Assert(!(boundaryThreshold < 0));
 
-  // should be false if boundaryThreshold is not specified
-  const bool REJECT_UNKNOWN_OUTLIERS = true;
+  // todo: handle unspecified value of boundaryThreshold more gracefully
+  const EmbValT boundaryThreshold = (boundaryThreshold_ == NotSpecified) ? 0 :
+                                    boundaryThreshold_;
+
+  // will not complain if boundaryThreshold_ was -1, since it's a default value
+  // and will be overwritten with 0
+  CV_Assert(!(boundaryThreshold < 0));
 
   const FindPolyMethod FITTING_METHOD = fittingMethod;
   const InfluenceMethod INFLUENCE_METHOD = influenceMethod;
@@ -135,12 +193,22 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
 
   const bool NORMALIZE_QUADRATICS = normalizeQuadratics;
 
+  const EmbValT minOutlierPercentage =
+      chooseMinOutlierPercentage(minOutlierPercentage_, maxOutlierPercentage_);
+
+  const EmbValT maxOutlierPercentage =
+      chooseMaxOutlierPercentage(minOutlierPercentage_, maxOutlierPercentage_);
+
+  const bool REJECT_UNKNOWN_OUTLIERS = chooseRUO(boundaryThreshold_,
+                                                 minOutlierPercentage_,
+                                                 maxOutlierPercentage_);
+
+  const bool REJECT_KNOWN_OUTLIERS = chooseRKO(minOutlierPercentage_,
+                                               maxOutlierPercentage_);
+
   CV_Assert(!(maxOutlierPercentage < 0 || maxOutlierPercentage >= 1));
   CV_Assert(!(minOutlierPercentage < 0 || minOutlierPercentage >= 1));
   CV_Assert(!(minOutlierPercentage > maxOutlierPercentage));
-
-  // should be false if min-/maxOutlierPercentage is not specified
-  const bool REJECT_KNOWN_OUTLIERS = true;
 
   const bool RETEST_OUTLIERS = retestOutliers;
 
