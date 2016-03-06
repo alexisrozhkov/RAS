@@ -3,6 +3,7 @@
 #include <core/robust_algebraic_segmentation.h>
 #include <core/perspective_embedding.h>
 #include <core/utils/cholesky.h>
+#include <core/utils/jacobi_svd.h>
 #include <core/utils/subspace_angle.h>
 #include <vector>
 #include <utility>
@@ -65,6 +66,18 @@ Mat2D sliceIdx2(const Mat3D &src, const int idx) {
   for (int j = 0; j < static_cast<int>(src.size()); j++) {
     for (int i = 0; i < src[0].cols; i++) {
       temp(j, i) = src[j](idx, i);
+    }
+  }
+
+  return temp;
+}
+
+Mat2D sliceIdx3(const Mat3D &src, const int idx) {
+  Mat2D temp(static_cast<int>(src.size()), src[0].rows);
+
+  for (int j = 0; j < static_cast<int>(src.size()); j++) {
+    for (int i = 0; i < src[0].rows; i++) {
+      temp(j, i) = src[j](i, idx);
     }
   }
 
@@ -251,6 +264,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
   std::vector<InflVal> influenceValues(sampleCount);
 
   Mat2D polynomialCoefficients;
+  Mat2D polynomialNormals;
 
   if (REJECT_KNOWN_OUTLIERS || REJECT_UNKNOWN_OUTLIERS) {
     if (INFLUENCE_METHOD == InfluenceMethod::SAMPLE) {
@@ -330,7 +344,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
     ////////////////////////////////////////////////////////////////////////////
     // Step 4: Compute Derivatives and Hessians for the fitting polynomial.
     const int dimensionCount = jointImageData.rows;
-    Mat2D polynomialNormals = Mat2D::zeros(dimensionCount,
+    polynomialNormals = Mat2D::zeros(dimensionCount,
                                            static_cast<int>(sampleCount));
 
     for (int eIdx = 0; eIdx < dimensionCount; eIdx++) {
@@ -386,7 +400,84 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
     }
   }
 
-  std::cout << polynomialHessians << std::endl;
+  //////////////////////////////////////////////////////////////////////////////
+  // Step 6: Compute Tangent Spaces and Mutual Contractions. Use Mutual
+  // Contractions as a similarity metric for spectral clustering. This
+  // particular algorithm tries to oversegment the sample by using a
+  // conservative tolerance.
+
+  Mat2D t1, t2, t3, t4;
+  t1 = polynomialCoefficients.t() * veroneseData;
+  cv::pow(t1, 2., t2);
+  cv::pow(polynomialNormals, 2., t3);
+  reduce(t3, t4, 0, cv::REDUCE_SUM);
+
+  std::vector<InflVal> normalLen(static_cast<size_t>(t2.cols));
+
+  for (int i = 0; i < t2.cols; i++) {
+    normalLen[i] = InflVal(t2(i)/t4(i), i);
+  }
+
+  std::sort(normalLen.begin(), normalLen.end(), sort_pred());
+
+  std::vector<int> sortedIndices(static_cast<size_t>(t2.cols));
+  for (int i = 0; i < t2.cols; i++) {
+    sortedIndices[i] = normalLen[i].second;
+  }
+
+  jointImageData = filterIdx2(jointImageData, sortedIndices);
+  polynomialNormals = filterIdx2(polynomialNormals, sortedIndices);
+  polynomialHessians = filterIdx3(polynomialHessians, sortedIndices);
+
+  auto emb = perspective_embedding(jointImageData, 1, false);
+  auto embeddedData = emb.getV().back();
+  auto DembeddedData = emb.getD().back();
+  auto HembeddedData = emb.getH().back();
+
+  IndexMat2D labels = IndexMat2D::ones(1, static_cast<int>(sampleCount))*-1;
+
+  // todo: find out required size
+  IndexMat2D clusterPrototype = Mat2D::zeros(1, static_cast<int>(sampleCount));
+  int clusterCount = 1;
+
+  labels(0) = 0;
+  clusterPrototype(0) = 0;
+  EmbValT cosTolerance = cos(angleTolerance);
+
+  for (int sampleIdx = 1; sampleIdx < sampleCount; sampleIdx++) {
+    for (int clusterIdx = 0; clusterIdx < clusterCount; clusterIdx++) {
+      std::vector<int> indices {sampleIdx, clusterPrototype(clusterIdx)};
+
+      Mat2D U;
+      jacobiSVD_U(filterIdx2(polynomialNormals, indices), &U);
+
+      Mat2D T = U.colRange(2, U.cols);
+
+      Mat2D C1 = T.t() * sliceIdx3(polynomialHessians,
+                                   sampleIdx) * T;
+
+      Mat2D C2 = T.t() * sliceIdx3(polynomialHessians,
+                                   clusterPrototype(clusterIdx)) * T;
+
+      auto C1_ = C1.reshape(0, 1);
+      auto C2_ = C2.reshape(0, C2.rows*C2.cols);
+
+      Mat2D Cp = cv::abs(C1_/cv::norm(C1_) * C2_/cv::norm(C2_));
+
+      if (Cp(0) >= cosTolerance) {
+        labels(sampleIdx) = clusterIdx;
+        break;
+      }
+    }
+
+    if (labels(sampleIdx) == -1) {
+      clusterCount = clusterCount + 1;
+      labels(sampleIdx) = clusterCount;
+      clusterPrototype(clusterCount) = sampleIdx;
+    }
+  }
+
+  std::cout << labels << std::endl;
 
   return veroneseData;
 }

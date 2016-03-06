@@ -5,7 +5,7 @@ add_definitions(-std=c++11)
 find_package(OpenCV REQUIRED)
 
 include_directories(${OpenCV_INCLUDE_DIRS}
-                    ..)
+                    ${PROJECT_SOURCE_DIR})
 
 add_library(RAS STATIC
             utils/ras_types.cpp
@@ -13,6 +13,7 @@ add_library(RAS STATIC
             utils/generalized_eigenvalues.cpp
             utils/cholesky.cpp
             utils/subspace_angle.cpp
+            utils/jacobi_svd.cpp
             perspective_embedding.cpp
             find_polynomials.cpp
             robust_algebraic_segmentation.cpp)
