@@ -71,6 +71,18 @@ Mat2D sliceIdx2(const Mat3D &src, const int idx) {
   return temp;
 }
 
+Mat2D sliceIdx23(const Mat4D &src, const int idx1, const int idx2) {
+  Mat2D temp(static_cast<int>(src.size()), src[0][0].cols);
+
+  for (int j = 0; j < static_cast<int>(src.size()); j++) {
+    for (int i = 0; i < src[0][0].cols; i++) {
+      temp(j, i) = src[j][idx1](idx2, i);
+    }
+  }
+
+  return temp;
+}
+
 Mat2D mapPerspective(const Mat2D &img1,
                      const Mat2D &img2,
                      const bool NORMALIZE_DATA) {
@@ -238,9 +250,11 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
   std::vector<InflVal> sortedIndex(sampleCount);
   std::vector<InflVal> influenceValues(sampleCount);
 
+  Mat2D polynomialCoefficients;
+
   if (REJECT_KNOWN_OUTLIERS || REJECT_UNKNOWN_OUTLIERS) {
     if (INFLUENCE_METHOD == InfluenceMethod::SAMPLE) {
-      auto polynomialCoefficients = find_polynomials(veroneseData,
+      polynomialCoefficients = find_polynomials(veroneseData,
                                                      veroneseDerivative,
                                                      FITTING_METHOD,
                                                      1);
@@ -309,9 +323,9 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
       veroneseHessian = filterIdx4(untrimmedHessian, inlierIndices);
     }
 
-    auto polynomialCoefficients = find_polynomials(veroneseData,
-                                                   veroneseDerivative,
-                                                   FITTING_METHOD, 1);
+    polynomialCoefficients = find_polynomials(veroneseData,
+                                              veroneseDerivative,
+                                              FITTING_METHOD, 1);
 
     ////////////////////////////////////////////////////////////////////////////
     // Step 4: Compute Derivatives and Hessians for the fitting polynomial.
@@ -323,8 +337,6 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
       polynomialNormals.row(eIdx) = polynomialCoefficients.t() *
           sliceIdx2(veroneseDerivative, eIdx);
     }
-
-    std::cout << polynomialNormals << std::endl << std::endl;
 
     ////////////////////////////////////////////////////////////////////////////
     // Step 5: Estimate rejection percentage via Sampson distance
@@ -352,6 +364,29 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
       }
     }
   }
+
+  const int dimensionCount = 5;
+
+  // todo: use Mat3D_zeros here
+  Mat3D polynomialHessians(dimensionCount);
+  for (int eIdx1 = 0; eIdx1 < dimensionCount; eIdx1++) {
+    polynomialHessians[eIdx1] = Mat2D(dimensionCount,
+                                      static_cast<int>(sampleCount));
+  }
+
+  for (int eIdx1 = 0; eIdx1 < dimensionCount; eIdx1++) {
+    for (int eIdx2 = eIdx1; eIdx2 < dimensionCount; eIdx2++) {
+      polynomialHessians[eIdx1].row(eIdx2) = polynomialCoefficients.t() *
+          sliceIdx23(veroneseHessian, eIdx1, eIdx2);
+
+      if (eIdx1 != eIdx2) {
+        polynomialHessians[eIdx1].row(eIdx2).copyTo(
+            polynomialHessians[eIdx2].row(eIdx1));
+      }
+    }
+  }
+
+  std::cout << polynomialHessians << std::endl;
 
   return veroneseData;
 }
