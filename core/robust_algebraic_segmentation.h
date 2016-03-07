@@ -5,6 +5,7 @@
 
 #include <core/utils/ras_types.h>
 #include <core/find_polynomials.h>
+#include <vector>
 
 
 enum class InfluenceMethod {
@@ -29,7 +30,8 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
 
                                     const int debug = 0,
                                     const bool postRansac = true,
-                                    const EmbValT angleTolerance = CV_PI/60,
+                                    const std::vector<EmbValT> angleTolerance =
+                                        {CV_PI/60},
                                     const FindPolyMethod fittingMethod =
                                           FindPolyMethod::FISHER,
                                     const InfluenceMethod influenceMethod =

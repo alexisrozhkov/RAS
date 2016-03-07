@@ -114,7 +114,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
 
                                     const int debug,
                                     const bool postRansac,
-                                    const EmbValT angleTolerance,
+                                    const std::vector<EmbValT> angleTolerance,
                                     const FindPolyMethod fittingMethod,
                                     const InfluenceMethod influenceMethod,
                                     const bool normalizeCoordinates,
@@ -126,7 +126,9 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
   const int DEBUG = debug;
   const bool POST_RANSAC = postRansac;
 
-  CV_Assert(!(angleTolerance < 0 || angleTolerance >= CV_PI / 2));
+  for (size_t i = 0; i < angleTolerance.size(); i++) {
+    CV_Assert(!(angleTolerance[i] < 0 || angleTolerance[i] >= CV_PI / 2));
+  }
 
   // todo: handle unspecified value of boundaryThreshold more gracefully
   const EmbValT boundaryThreshold = (boundaryThreshold_ == NotSpecified) ? 0 :
@@ -240,7 +242,9 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
   int outlierIndex = 0;
   std::vector<int> inlierIndices(sortedIndex.size());
 
-  for (EmbValT outlierPercentage = minOutlierPercentage;
+  EmbValT outlierPercentage;
+
+  for (outlierPercentage = minOutlierPercentage;
        outlierPercentage <= maxOutlierPercentage;
        outlierPercentage += outlierStep) {
     outlierIndex += 1;
@@ -348,93 +352,153 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
   auto DembeddedData = emb.getD().back();
   auto HembeddedData = emb.getH().back();
 
-  IndexMat2D labels = IndexMat2D::ones(1, static_cast<int>(sampleCount))*-1;
+  const int angleCount = static_cast<int>(angleTolerance.size());
+  IndexMat2D allLabels = IndexMat2D::ones(angleCount,
+                                          static_cast<int>(sampleCount))*-1;
 
-  // todo: find out required size
-  IndexMat2D clusterPrototype = Mat2D::zeros(1, static_cast<int>(sampleCount));
-  int clusterCount = 1;
+  IndexMat2D labels;
 
-  labels(0) = 0;
-  clusterPrototype(0) = 0;
-  EmbValT cosTolerance = cos(angleTolerance);
+  for (int angleIndex = 0; angleIndex < angleCount; angleIndex++) {
+    labels = IndexMat2D::ones(1, static_cast<int>(sampleCount))*-1;
 
-  for (int sampleIdx = 1; sampleIdx < static_cast<int>(sampleCount);
-       sampleIdx++) {
-    for (int clusterIdx = 0; clusterIdx < clusterCount; clusterIdx++) {
-      std::vector<int> indices {sampleIdx, clusterPrototype(clusterIdx)};
+    int clusterCount = 0;
+    labels(0) = 0;
+
+    // todo: find out required size
+    IndexMat2D
+        clusterPrototype = Mat2D::zeros(1, static_cast<int>(sampleCount));
+    clusterPrototype(0) = 0;
+
+    EmbValT cosTolerance = cos(angleTolerance[angleIndex]);
+
+    for (int sampleIdx = 1; sampleIdx < static_cast<int>(sampleCount);
+         sampleIdx++) {
+      for (int clusterIdx = 0; clusterIdx < clusterCount; clusterIdx++) {
+        std::vector<int> indices{sampleIdx, clusterPrototype(clusterIdx)};
+
+        Mat2D U;
+        jacobiSVD_U(filterIdx2(polynomialNormals, indices), &U);
+
+        Mat2D T = U.colRange(2, U.cols);
+
+        Mat2D C1 = T.t() * sliceIdx3(polynomialHessians,
+                                     sampleIdx) * T;
+
+        Mat2D C2 = T.t() * sliceIdx3(polynomialHessians,
+                                     clusterPrototype(clusterIdx)) * T;
+
+        auto C1_ = C1.reshape(0, 1);
+        auto C2_ = C2.reshape(0, C2.rows * C2.cols);
+
+        Mat2D Cp = cv::abs(C1_ / cv::norm(C1_) * C2_ / cv::norm(C2_));
+
+        if (Cp(0) >= cosTolerance) {
+          labels(sampleIdx) = clusterIdx;
+          break;
+        }
+      }
+
+      if (labels(sampleIdx) == -1) {
+        clusterCount = clusterCount + 1;
+        labels(sampleIdx) = clusterCount;
+        clusterPrototype(clusterCount) = sampleIdx;
+      }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Step 7: Recover quadratic matrices for each cluster.
+
+    if (clusterCount < static_cast<int>(groupCount)) {
+      std::runtime_error("Too few motion models found. "\
+                       "Please choose a smaller angleTolerance");
+    }
+
+    Mat3D
+        quadratics = Mat3D_zeros(dimensionCount, dimensionCount, clusterCount);
+
+    for (int clusterIndex = 0; clusterIndex < clusterCount; clusterIndex++) {
+      std::vector<int> currIndices;
+      for (int i = 0; i < labels.cols; i++) {
+        if (labels(i) == clusterIndex) {
+          currIndices.push_back(i);
+        }
+      }
+
+      int clusterSize = static_cast<int>(currIndices.size());
+      auto clusterData = filterIdx2(embeddedData, currIndices);
+      auto clusterHessian = filterIdx4(HembeddedData, currIndices);
 
       Mat2D U;
-      jacobiSVD_U(filterIdx2(polynomialNormals, indices), &U);
+      jacobiSVD_U(clusterData, &U);
 
-      Mat2D T = U.colRange(2, U.cols);
+      Mat3D hpn = polyHessian(dimensionCount,
+                              clusterSize,
+                              U.col(U.cols - 1),
+                              clusterHessian);
 
-      Mat2D C1 = T.t() * sliceIdx3(polynomialHessians,
-                                   sampleIdx) * T;
+      auto quad = meanIdx3(hpn);
+      if (NORMALIZE_QUADRATICS) {
+        quad /= cv::norm(quad);
+      }
 
-      Mat2D C2 = T.t() * sliceIdx3(polynomialHessians,
-                                   clusterPrototype(clusterIdx)) * T;
-
-      auto C1_ = C1.reshape(0, 1);
-      auto C2_ = C2.reshape(0, C2.rows*C2.cols);
-
-      Mat2D Cp = cv::abs(C1_/cv::norm(C1_) * C2_/cv::norm(C2_));
-
-      if (Cp(0) >= cosTolerance) {
-        labels(sampleIdx) = clusterIdx;
-        break;
+      for (int j = 0; j < dimensionCount; j++) {
+        for (int i = 0; i < dimensionCount; i++) {
+          quadratics[j](i, clusterIndex) = quad(j, i);
+        }
       }
     }
 
-    if (labels(sampleIdx) == -1) {
-      clusterCount = clusterCount + 1;
-      labels(sampleIdx) = clusterCount;
-      clusterPrototype(clusterCount) = sampleIdx;
+    ////////////////////////////////////////////////////////////////////////////
+    // Step 8: Kill off smaller clusters one at a time, reassigning samples
+    // to remaining clusters with minimal algebraic distance.
+
+    while (clusterCount > static_cast<int>(groupCount)) {
+      // todo
+      break;
     }
+
+    auto labelsCopy = labels.clone();
+    for (int i = 0; i < static_cast<int>(sampleCount); i++) {
+      labels(sortedIndices[i]) = labelsCopy(i);
+    }
+
+    labels.copyTo(allLabels.row(angleIndex));
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Step 7: Recover quadratic matrices for each cluster.
-
-  if (clusterCount < static_cast<int>(groupCount)) {
-    std::runtime_error("Too few motion models found. "\
-                       "Please choose a smaller angleTolerance");
+  if (angleCount != 1) {
+    // todo:
+    // labels = aggregate_labels(allLabels, groupCount);
   }
 
-  Mat3D quadratics = Mat3D_zeros(dimensionCount, dimensionCount, clusterCount);
+  if (REJECT_UNKNOWN_OUTLIERS || REJECT_KNOWN_OUTLIERS) {
+    IndexMat2D untrimmedAllLabels = -1*IndexMat2D::ones(angleCount,
+                                        static_cast<int>(untrimmedSampleCount));
 
-  for (int clusterIndex = 0; clusterIndex < clusterCount; clusterIndex++) {
-    std::vector<int> currIndices;
-    for (int i = 0; i < labels.cols; i++) {
-      if (labels(i) == clusterIndex) {
-        currIndices.push_back(i);
-      }
+    for (int i = 0; i < static_cast<int>(inlierIndices.size()); i++) {
+      allLabels.col(i).copyTo(untrimmedAllLabels.col(inlierIndices[i]));
     }
 
-    int clusterSize = static_cast<int>(currIndices.size());
-    auto clusterData = filterIdx2(embeddedData, currIndices);
-    auto clusterHessian = filterIdx4(HembeddedData, currIndices);
+    allLabels = untrimmedAllLabels;
 
-    Mat2D U;
-    jacobiSVD_U(clusterData, &U);
+    IndexMat2D untrimmedLabels = -1*IndexMat2D::ones(1,
+                                        static_cast<int>(untrimmedSampleCount));
 
-    Mat3D hpn = polyHessian(dimensionCount,
-                            clusterSize,
-                            U.col(U.cols-1),
-                            clusterHessian);
-
-    auto quad = meanIdx3(hpn);
-    if (NORMALIZE_QUADRATICS) {
-      quad /= cv::norm(quad);
+    for (int i = 0; i < static_cast<int>(inlierIndices.size()); i++) {
+      untrimmedLabels(inlierIndices[i]) = labels(i);
     }
 
-    for (int j = 0; j < dimensionCount; j++) {
-      for (int i = 0; i < dimensionCount; i++) {
-        quadratics[j](i, clusterIndex) = quad(j, i);
-      }
-    }
+    labels = untrimmedLabels;
+
+    jointImageData = untrimmedData;
+    sampleCount = untrimmedSampleCount;
   }
 
-  std::cout << quadratics << std::endl;
+  if (REJECT_UNKNOWN_OUTLIERS && outlierPercentage >= maxOutlierPercentage) {
+    std::cout << "The RHQA function did not find an mixed motion model "\
+                 "within the boundary threshold." << std::endl;
+  }
+
+  std::cout << allLabels << std::endl;
 
   return veroneseData;
 }

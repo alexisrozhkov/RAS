@@ -31,7 +31,9 @@ int main() {
   auto mat1 = Mat2D(2, 10, img1);
   auto mat2 = Mat2D(2, 10, img2);
 
-  auto p = robust_algebraic_segmentation(mat1, mat2, 1, NotSpecified, 0.1, 0.2);
+  auto p = robust_algebraic_segmentation(mat1, mat2, 2, 0.25,
+                                         NotSpecified, NotSpecified,
+  0, true, {3*CV_PI/180, 4*CV_PI/180, 5*CV_PI/180, 6*CV_PI/180, 7*CV_PI/180});
 
   // std::cout << p << std::endl;
 
