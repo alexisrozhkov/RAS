@@ -104,6 +104,44 @@ Mat3D polyHessian(const int dimCount,
   return hpn;
 }
 
+void clusterQuad(const IndexMat2D &labels,
+                 const int clusterIdx,
+                 const int dimensionCount,
+                 const Mat2D &embeddedData,
+                 const Mat4D &HembeddedData,
+                 const bool NORMALIZE_QUADRATICS,
+                 Mat3D *quadratics) {
+  std::vector<int> currIndices;
+  for (int i = 0; i < labels.cols; i++) {
+    if (labels(i) == clusterIdx) {
+      currIndices.push_back(i);
+    }
+  }
+
+  int clusterSize = static_cast<int>(currIndices.size());
+  auto clusterData = filterIdx2(embeddedData, currIndices);
+  auto clusterHessian = filterIdx4(HembeddedData, currIndices);
+
+  Mat2D U;
+  jacobiSVD_U(clusterData, &U);
+
+  Mat3D hpn = polyHessian(dimensionCount,
+                          clusterSize,
+                          U.col(U.cols - 1),
+                          clusterHessian);
+
+  auto quad = meanIdx3(hpn);
+  if (NORMALIZE_QUADRATICS) {
+    quad /= cv::norm(quad);
+  }
+
+  for (int j = 0; j < dimensionCount; j++) {
+    for (int i = 0; i < dimensionCount; i++) {
+      (*quadratics)[j](i, clusterIdx) = quad(j, i);
+    }
+  }
+}
+
 Mat2D robust_algebraic_segmentation(const Mat2D &img1,
                                     const Mat2D &img2,
                                     const unsigned int groupCount,
@@ -405,6 +443,9 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
       }
     }
 
+    // todo: check
+    clusterCount++;
+
     ////////////////////////////////////////////////////////////////////////////
     // Step 7: Recover quadratic matrices for each cluster.
 
@@ -417,35 +458,13 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
         quadratics = Mat3D_zeros(dimensionCount, dimensionCount, clusterCount);
 
     for (int clusterIndex = 0; clusterIndex < clusterCount; clusterIndex++) {
-      std::vector<int> currIndices;
-      for (int i = 0; i < labels.cols; i++) {
-        if (labels(i) == clusterIndex) {
-          currIndices.push_back(i);
-        }
-      }
-
-      int clusterSize = static_cast<int>(currIndices.size());
-      auto clusterData = filterIdx2(embeddedData, currIndices);
-      auto clusterHessian = filterIdx4(HembeddedData, currIndices);
-
-      Mat2D U;
-      jacobiSVD_U(clusterData, &U);
-
-      Mat3D hpn = polyHessian(dimensionCount,
-                              clusterSize,
-                              U.col(U.cols - 1),
-                              clusterHessian);
-
-      auto quad = meanIdx3(hpn);
-      if (NORMALIZE_QUADRATICS) {
-        quad /= cv::norm(quad);
-      }
-
-      for (int j = 0; j < dimensionCount; j++) {
-        for (int i = 0; i < dimensionCount; i++) {
-          quadratics[j](i, clusterIndex) = quad(j, i);
-        }
-      }
+      clusterQuad(labels,
+                  clusterIndex,
+                  dimensionCount,
+                  embeddedData,
+                  HembeddedData,
+                  NORMALIZE_QUADRATICS,
+                  &quadratics);
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -453,8 +472,99 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
     // to remaining clusters with minimal algebraic distance.
 
     while (clusterCount > static_cast<int>(groupCount)) {
-      // todo
-      break;
+      std::vector<int> cSampleCounts(static_cast<size_t>(clusterCount));
+      for (int i = 0; i < labels.cols; i++) {
+        cSampleCounts[labels(i)] += 1;
+      }
+
+      int minVal = 1000, smallestClust = 0;
+      for (int i = 0; i < clusterCount; i++) {
+        if (cSampleCounts[i] < minVal) {
+          minVal = cSampleCounts[i];
+          smallestClust = i;
+        }
+      }
+
+      IndexMat2D clusterChanged = IndexMat2D::zeros(1, clusterCount-1);
+
+      if (smallestClust != clusterCount-1) {
+        for (int i = 0; i < labels.cols; i++) {
+          if (labels(i) == smallestClust) {
+            labels(i) = -1;
+          }
+        }
+
+        for (int i = 0; i < labels.cols; i++) {
+          if (labels(i) == clusterCount-1) {
+            labels(i) = smallestClust;
+          }
+        }
+
+        for (int i = 0; i < labels.cols; i++) {
+          if (labels(i) == -1) {
+            labels(i) = clusterCount-1;
+          }
+        }
+
+        auto temp = sliceIdx3(quadratics, smallestClust);
+
+        // auto quadraticsCopy = quadratics;
+        for (int j = 0; j < dimensionCount; j++) {
+          for (int i = 0; i < dimensionCount; i++) {
+            quadratics[j](i, smallestClust) = quadratics[j](i, clusterCount-1);
+            quadratics[j](i, clusterCount-1) = temp(j, i);
+          }
+        }
+      }
+
+      {
+        std::vector<int> sampleIdx;
+        for (int i = 0; i < labels.cols; i++) {
+          if (labels(i) == clusterCount - 1) {
+            sampleIdx.push_back(i);
+          }
+        }
+
+        Mat2D distance = 1e10 * Mat2D::ones(1, clusterCount - 1);
+        EmbValT minDist = 1e10;
+        int minIdx = 0;
+
+        for (int clusterIndex = 0; clusterIndex < clusterCount - 1;
+             clusterIndex++) {
+          Mat2D u1 = filterIdx2(jointImageData, sampleIdx);
+          Mat2D u2 = sliceIdx3(quadratics, clusterIndex);
+          Mat2D u3 = u1.t() * u2 * u1;
+
+          distance(clusterIndex) = fabs(u3(0));
+
+          if (distance(clusterIndex) < minDist) {
+            minDist = distance(clusterIndex);
+            minIdx = clusterIndex;
+          }
+        }
+
+        for (int i = 0; i < sampleIdx.size(); i++) {
+          labels(sampleIdx[i]) = minIdx;
+          clusterChanged(labels(sampleIdx[i])) = 1;
+        }
+      }
+
+      clusterCount -= 1;
+
+      for (int clusterIdx = 0; clusterIdx < clusterCount;
+          clusterIdx++) {
+        if (!clusterChanged(clusterIdx)) {
+          continue;
+        }
+
+        clusterQuad(labels,
+                    clusterIdx,
+                    dimensionCount,
+                    embeddedData,
+                    HembeddedData,
+                    NORMALIZE_QUADRATICS,
+                    &quadratics);
+      }
     }
 
     auto labelsCopy = labels.clone();
@@ -464,6 +574,8 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
 
     labels.copyTo(allLabels.row(angleIndex));
   }
+
+  std::cout << labels+1 << std::endl;
 
   if (angleCount != 1) {
     // todo:
