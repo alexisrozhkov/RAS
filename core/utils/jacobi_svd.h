@@ -3,7 +3,7 @@
 #ifndef CORE_UTILS_JACOBI_SVD_H_
 #define CORE_UTILS_JACOBI_SVD_H_
 
-#include <core/utils/ras_types.h>
+#include <core/utils/mat_nd.h>
 
 
 void jacobiSVD_U(const Mat2D &A, Mat2D *U);

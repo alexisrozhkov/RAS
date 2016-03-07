@@ -3,7 +3,7 @@
 #ifndef CORE_PERSPECTIVE_EMBEDDING_H_
 #define CORE_PERSPECTIVE_EMBEDDING_H_
 
-#include <core/utils/ras_types.h>
+#include <core/utils/mat_nd.h>
 #include <ostream>
 #include <vector>
 

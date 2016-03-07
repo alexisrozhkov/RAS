@@ -19,100 +19,6 @@ struct sort_pred {
   }
 };
 
-Mat2D filterIdx2(const Mat2D &src, const std::vector<int> &indices) {
-  Mat2D out(src.rows, static_cast<int>(indices.size()));
-
-  for (int i = 0; i < static_cast<int>(indices.size()); i++) {
-    src.col(indices[i]).copyTo(out.col(i));
-  }
-
-  return out;
-}
-
-Mat3D filterIdx3(const Mat3D &src, const std::vector<int> &indices) {
-  Mat3D out = src;
-
-  for (size_t j = 0; j < src.size(); j++) {
-    out[j] = Mat2D(src[j].rows, static_cast<int>(indices.size()));
-
-    for (int i = 0; i < static_cast<int>(indices.size()); i++) {
-      src[j].col(indices[i]).copyTo(out[j].col(i));
-    }
-  }
-
-  return out;
-}
-
-Mat4D filterIdx4(const Mat4D &src, const std::vector<int> &indices) {
-  Mat4D out = src;
-
-  for (size_t k = 0; k < src.size(); k++) {
-    for (size_t j = 0; j < src[0].size(); j++) {
-      out[k][j] = Mat2D(src[k][j].rows,
-                        static_cast<int>(indices.size()));
-
-      for (int i = 0; i < static_cast<int>(indices.size()); i++) {
-        src[k][j].col(indices[i]).copyTo(out[k][j].col(i));
-      }
-    }
-  }
-
-  return out;
-}
-
-Mat2D sliceIdx2(const Mat3D &src, const int idx) {
-  Mat2D temp(static_cast<int>(src.size()), src[0].cols);
-
-  for (int j = 0; j < static_cast<int>(src.size()); j++) {
-    for (int i = 0; i < src[0].cols; i++) {
-      temp(j, i) = src[j](idx, i);
-    }
-  }
-
-  return temp;
-}
-
-Mat2D sliceIdx3(const Mat3D &src, const int idx) {
-  Mat2D temp(static_cast<int>(src.size()), src[0].rows);
-
-  for (int j = 0; j < static_cast<int>(src.size()); j++) {
-    for (int i = 0; i < src[0].rows; i++) {
-      temp(j, i) = src[j](i, idx);
-    }
-  }
-
-  return temp;
-}
-
-Mat2D meanIdx3(const Mat3D &src) {
-  Mat2D temp(static_cast<int>(src.size()), src[0].rows);
-
-  for (int j = 0; j < static_cast<int>(src.size()); j++) {
-    for (int i = 0; i < src[0].rows; i++) {
-      EmbValT sm = 0;
-      for (int k = 0; k < src[0].cols; k++) {
-        sm += src[j](i, k);
-      }
-
-      temp(j, i) = sm/src[0].cols;
-    }
-  }
-
-  return temp;
-}
-
-Mat2D sliceIdx23(const Mat4D &src, const int idx1, const int idx2) {
-  Mat2D temp(static_cast<int>(src.size()), src[0][0].cols);
-
-  for (int j = 0; j < static_cast<int>(src.size()); j++) {
-    for (int i = 0; i < src[0][0].cols; i++) {
-      temp(j, i) = src[j][idx1](idx2, i);
-    }
-  }
-
-  return temp;
-}
-
 Mat2D mapPerspective(const Mat2D &img1,
                      const Mat2D &img2,
                      const bool NORMALIZE_DATA) {
@@ -167,50 +73,30 @@ EmbValT chooseMaxOutlierPercentage(const EmbValT minOutlierPercentage,
 
 bool chooseRKO(const EmbValT minOutlierPercentage,
                const EmbValT maxOutlierPercentage) {
-  const bool defaultVal = false;
-
-  if ((minOutlierPercentage > 0) &&
-      (maxOutlierPercentage == NotSpecified)) {
-      return true;  // one value given and its positive
-  }
-
-  return defaultVal;
+  return (minOutlierPercentage > 0) &&
+         (maxOutlierPercentage == NotSpecified);
 }
 
 bool chooseRUO(const EmbValT boundaryThreshold,
                const EmbValT minOutlierPercentage,
                const EmbValT maxOutlierPercentage) {
-  const bool defaultVal = false;
-
-  if (boundaryThreshold != NotSpecified) {
-    return true;  // boundary threshold specified
-  }
-
-  if ((minOutlierPercentage != NotSpecified) &&
-      (maxOutlierPercentage != NotSpecified)) {
-    return true;  // outlier range specified
-  }
-
-  return defaultVal;
+  return boundaryThreshold != NotSpecified ||
+      ((minOutlierPercentage != NotSpecified) &&
+       (maxOutlierPercentage != NotSpecified));
 }
 
-Mat3D polyHessian(const int dimensionCount,
+Mat3D polyHessian(const int dimCount,
                   const int samplesCount,
                   const Mat2D &coeffs,
                   const Mat4D &hessian) {
-  // todo: use Mat3d_zeros here
-  Mat3D hpn(static_cast<size_t>(dimensionCount));
+  Mat3D hpn = Mat3D_zeros(dimCount, dimCount, samplesCount);
 
-  for (int i = 0; i < dimensionCount; i++) {
-    hpn[i] = Mat2D(dimensionCount, samplesCount);
-  }
+  for (int idx1 = 0; idx1 < dimCount; idx1++) {
+    for (int idx2 = idx1; idx2 < dimCount; idx2++) {
+      hpn[idx1].row(idx2) = coeffs.t() * sliceIdx23(hessian, idx1, idx2);
 
-  for (int eIdx1 = 0; eIdx1 < dimensionCount; eIdx1++) {
-    for (int eIdx2 = eIdx1; eIdx2 < dimensionCount; eIdx2++) {
-      hpn[eIdx1].row(eIdx2) = coeffs.t() * sliceIdx23(hessian, eIdx1, eIdx2);
-
-      if (eIdx1 != eIdx2) {
-        hpn[eIdx1].row(eIdx2).copyTo(hpn[eIdx2].row(eIdx1));
+      if (idx1 != idx2) {
+        hpn[idx1].row(idx2).copyTo(hpn[idx2].row(idx1));
       }
     }
   }
@@ -248,7 +134,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
 
   // will not complain if boundaryThreshold_ was -1, since it's a default value
   // and will be overwritten with 0
-  CV_Assert(!(boundaryThreshold < 0));
+  CV_Assert(boundaryThreshold >= 0);
 
   const FindPolyMethod FITTING_METHOD = fittingMethod;
   const InfluenceMethod INFLUENCE_METHOD = influenceMethod;
@@ -274,7 +160,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
 
   CV_Assert(!(maxOutlierPercentage < 0 || maxOutlierPercentage >= 1));
   CV_Assert(!(minOutlierPercentage < 0 || minOutlierPercentage >= 1));
-  CV_Assert(!(minOutlierPercentage > maxOutlierPercentage));
+  CV_Assert(minOutlierPercentage <= maxOutlierPercentage);
 
   const bool RETEST_OUTLIERS = retestOutliers;
 
@@ -298,7 +184,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
   Mat2D untrimmedVeronese;
   Mat3D untrimmedDerivative;
   Mat4D untrimmedHessian;
-  size_t untrimmedSampleCount;
+  size_t untrimmedSampleCount = 0;
 
   size_t sampleCount = static_cast<size_t>(jointImageData.cols);
   std::vector<InflVal> sortedIndex(sampleCount);
@@ -514,12 +400,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
                        "Please choose a smaller angleTolerance");
   }
 
-  // todo: use Mat3d_zeros here
-  Mat3D quadratics(dimensionCount);
-
-  for (int i = 0; i < dimensionCount; i++) {
-    quadratics[i] = Mat2D(dimensionCount, clusterCount);
-  }
+  Mat3D quadratics = Mat3D_zeros(dimensionCount, dimensionCount, clusterCount);
 
   for (int clusterIndex = 0; clusterIndex < clusterCount; clusterIndex++) {
     std::vector<int> currIndices;

@@ -6,31 +6,6 @@
 
 
 // utilities
-Mat3D Mat3D_zeros(const int A,
-                  const int B,
-                  const int C) {
-  auto temp = Mat2DArray((uint) A);
-
-  for (int k = 0; k < A; k++) {
-    temp[k] = Mat2D::zeros(B, C);
-  }
-
-  return temp;
-}
-
-Mat4D Mat4D_zeros(const int A,
-                  const int B,
-                  const int C,
-                  const int D) {
-  auto temp = Mat3DArray((uint) A);
-
-  for (int k = 0; k < A; k++) {
-    temp[k] = Mat3D_zeros(B, C, D);
-  }
-
-  return temp;
-}
-
 IndexMat2D findNonPositiveCols(const Mat2D &data) {
   IndexMat2D nonPositive = IndexMat2D::zeros(data.cols, 1);
 

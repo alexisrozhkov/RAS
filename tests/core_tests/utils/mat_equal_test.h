@@ -3,7 +3,7 @@
 #ifndef TESTS_CORE_TESTS_UTILS_MAT_EQUAL_TEST_H_
 #define TESTS_CORE_TESTS_UTILS_MAT_EQUAL_TEST_H_
 
-#include <core/utils/ras_types.h>
+#include <core/utils/mat_nd.h>
 #include <gtest/gtest.h>
 
 

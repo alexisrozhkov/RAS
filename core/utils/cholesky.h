@@ -3,7 +3,7 @@
 #ifndef CORE_UTILS_CHOLESKY_H_
 #define CORE_UTILS_CHOLESKY_H_
 
-#include <core/utils/ras_types.h>
+#include <core/utils/mat_nd.h>
 
 // Calculates upper triangular matrix S, where A is a symmetrical matrix A=S'*S
 // todo: add tests

@@ -9,6 +9,7 @@ include_directories(${OpenCV_INCLUDE_DIRS}
 
 add_library(RAS STATIC
             utils/ras_types.cpp
+            utils/mat_nd.cpp
             utils/balls_and_bins.cpp
             utils/generalized_eigenvalues.cpp
             utils/cholesky.cpp

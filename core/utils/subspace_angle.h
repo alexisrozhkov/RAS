@@ -3,7 +3,7 @@
 #ifndef CORE_UTILS_SUBSPACE_ANGLE_H_
 #define CORE_UTILS_SUBSPACE_ANGLE_H_
 
-#include <core/utils/ras_types.h>
+#include <core/utils/mat_nd.h>
 
 
 //  SUBSPACE_GPCA
