@@ -7,5 +7,6 @@
 
 
 void armaSVD_U(const Mat2D &A, Mat2D *U);
+void armaSVD_V(const Mat2D &A, Mat2D *V);
 
 #endif  // CORE_UTILS_ARMA_SVD_H_
