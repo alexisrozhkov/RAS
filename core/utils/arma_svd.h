@@ -6,6 +6,7 @@
 #include <core/utils/mat_nd.h>
 
 
+void armaSVD_S(const Mat2D &A, Mat2D *S);
 void armaSVD_U(const Mat2D &A, Mat2D *U);
 void armaSVD_V(const Mat2D &A, Mat2D *V);
 

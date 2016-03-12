@@ -22,6 +22,14 @@ Mat2D arma2cv(AMat2D &src) {
   return Mat2D((int)src.n_cols, (int)src.n_rows, src.memptr()).t();
 }
 
+void armaSVD_S(const Mat2D &A, Mat2D *S_) {
+  AMat1D S;
+  AMat2D U, V;
+  arma::svd(U, S, V, cv2arma(A), "std");
+  AMat2D SS = arma::diagmat(S);
+  *S_ = arma2cv(SS);
+}
+
 void armaSVD_U(const Mat2D &A, Mat2D *U_) {
   AMat1D S;
   AMat2D U, V;
