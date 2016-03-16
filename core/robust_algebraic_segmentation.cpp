@@ -150,12 +150,11 @@ Mat3D polyHessian(const int samplesCount,
   return hpn;
 }
 
-void clusterQuad(const IndexMat2D &labels,
-                 const int clusterIdx,
-                 const Mat2D &embeddedData,
-                 const Mat4D &HembeddedData,
-                 const bool NORMALIZE_QUADRATICS,
-                 Mat3D *quadratics) {
+Mat2D clusterQuadratic(const IndexMat2D &labels,
+                       const int clusterIdx,
+                       const Mat2D &embeddedData,
+                       const Mat4D &HembeddedData,
+                       const bool NORMALIZE_QUADRATICS) {
   std::vector<int> currIndices;
   for (int i = 0; i < labels.cols; i++) {
     if (labels(i) == clusterIdx) {
@@ -179,11 +178,7 @@ void clusterQuad(const IndexMat2D &labels,
     quad /= cv::norm(quad);
   }
 
-  for (int j = 0; j < dimensionCount; j++) {
-    for (int i = 0; i < dimensionCount; i++) {
-      (*quadratics)[j](i, clusterIdx) = quad(j, i);
-    }
-  }
+  return quad;
 }
 
 void step8(const unsigned int groupCount,
@@ -229,20 +224,9 @@ void step8(const unsigned int groupCount,
         }
       }
 
-      auto temp = sliceIdx3(quadratics, smallestClust);
-
-      auto quadraticsCopy = quadratics;
-      for (int j = 0; j < dimensionCount; j++) {
-        for (int i = 0; i < dimensionCount; i++) {
-          quadratics[j](i, smallestClust) = quadraticsCopy[j](i, clusterCount-1);
-        }
-      }
-
-      for (int j = 0; j < dimensionCount; j++) {
-        for (int i = 0; i < dimensionCount; i++) {
-          quadratics[j](i, clusterCount-1) = temp(j, i);
-        }
-      }
+      Mat2D temp = quadratics[smallestClust].clone();
+      quadratics[smallestClust] = quadratics[clusterCount-1];
+      quadratics[clusterCount-1] = temp;
     }
 
     {
@@ -258,41 +242,35 @@ void step8(const unsigned int groupCount,
         EmbValT minDist = std::numeric_limits<EmbValT>::max();
         Mat2D distance = minDist * Mat2D::ones(1, clusterCount - 1);
 
-        for (int clusterIndex = 0; clusterIndex < clusterCount - 1;
-             clusterIndex++) {
-          Mat2D u1 = jointImageData.col(sampleIdx[j]);//sliceIdx2(jointImageData, sampleIdx[j]);
-          Mat2D u2 = sliceIdx3(quadratics, clusterIndex);
-          Mat2D u3 = u1.t() * u2 * u1;
+        for (int clstrIdx = 0; clstrIdx < clusterCount - 1; clstrIdx++) {
+          Mat2D u1 = jointImageData.col(sampleIdx[j]);
+          Mat2D u3 = u1.t() * quadratics[clstrIdx] * u1;
 
-          distance(clusterIndex) = fabs(u3(0));
+          distance(clstrIdx) = fabs(u3(0));
 
-          if (distance(clusterIndex) < minDist) {
-            minDist = distance(clusterIndex);
-            minIdx = clusterIndex;
+          if (distance(clstrIdx) < minDist) {
+            minDist = distance(clstrIdx);
+            minIdx = clstrIdx;
           }
         }
 
-        //for (int i = 0; i < sampleIdx.size(); i++) {
-          labels(sampleIdx[j]) = minIdx;
-          clusterChanged(labels(sampleIdx[j])) = 1;
-        //}
+        labels(sampleIdx[j]) = minIdx;
+        clusterChanged(labels(sampleIdx[j])) = 1;
       }
     }
 
     clusterCount -= 1;
 
-    for (int clusterIdx = 0; clusterIdx < clusterCount;
-         clusterIdx++) {
-      if (!clusterChanged(clusterIdx)) {
+    for (int clstrIdx = 0; clstrIdx < clusterCount; clstrIdx++) {
+      if (!clusterChanged(clstrIdx)) {
         continue;
       }
 
-      clusterQuad(labels,
-                  clusterIdx,
-                  embeddedData,
-                  HembeddedData,
-                  NORMALIZE_QUADRATICS,
-                  &quadratics);
+      quadratics[clstrIdx] = clusterQuadratic(labels,
+                                              clstrIdx,
+                                              embeddedData,
+                                              HembeddedData,
+                                              NORMALIZE_QUADRATICS);
     }
   }
 }
@@ -398,18 +376,17 @@ Mat3D recoverQuadratics(const int clusterCount,
                         const Mat2D &embeddedData,
                         const Mat4D &HembeddedData,
                         const bool NORMALIZE_QUADRATICS) {
-  Mat3D out = Mat3D_zeros(dimensionCount, dimensionCount, clusterCount);
+  Mat3D quads = Mat3D_zeros(clusterCount, dimensionCount, dimensionCount);
 
   for (int clusterIndex = 0; clusterIndex < clusterCount; clusterIndex++) {
-    clusterQuad(labels,
-                clusterIndex,
-                embeddedData,
-                HembeddedData,
-                NORMALIZE_QUADRATICS,
-                &out);
+    quads[clusterIndex] = clusterQuadratic(labels,
+                                           clusterIndex,
+                                           embeddedData,
+                                           HembeddedData,
+                                           NORMALIZE_QUADRATICS);
   }
 
-  return out;
+  return quads;
 }
 
 void step6(const unsigned int groupCount,
@@ -531,7 +508,7 @@ void step6(const unsigned int groupCount,
           quadratics);
 
     auto labelsCopy = labels.clone();
-    for (int i = 0; i < sampleCount                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   ; i++) {
+    for (int i = 0; i < sampleCount; i++) {
       labels(sortedIndices[i]) = labelsCopy(i);
     }
 
@@ -883,8 +860,8 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
 
     //std::cout << kronImg1Img2 << std::endl;
 
-    Mat3D bestF = Mat3D_zeros(3, 3, groupCount);
-    Mat3D bestH = Mat3D_zeros(3, 3, groupCount);
+    Mat3D bestF = Mat3D_zeros(groupCount, 3, 3);
+    Mat3D bestH = Mat3D_zeros(groupCount, 3, 3);
 
     std::vector<int> maxFGroupDataIndices;
 
@@ -938,11 +915,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
           maxFGroupDataIndices = std::vector<int>(groupDataIndices.begin()+iterationIndex,
                                                   groupDataIndices.begin()+(iterationIndex+FSampleSize));
 
-          for(int j = 0; j < 3; j++) {
-            for(int i = 0; i < 3; i++) {
-              bestF[j](i, grpIdx) = F(j, i);
-            }
-          }
+          bestF[grpIdx] = F;
         }
 
         break;
@@ -989,7 +962,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
 
 
           // todo: look more carefully - why would someone want to normalize
-          // homography matrix, which is defined up to scale?
+          // sign of homography matrix, which is defined up to scale?
           // 3.2. normalize the sign of matrix H
           /*
           IndexMat2D signArray = IndexMat2D::zeros(1, HSampleSize);
@@ -1032,11 +1005,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
           if (currentConsensus > maxHConsensus) {
             maxHConsensus = currentConsensus;
             maxHConsensusIndices = currentConsensusIndices.clone();
-            for(int j = 0; j < 3; j++) {
-              for(int i = 0; i < 3; i++) {
-                bestH[j](i, grpIdx) = H(j, i);
-              }
-            }
+            bestH[grpIdx] = H;
           }
         }
       }
@@ -1079,6 +1048,11 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
           }
         }
       }
+    }
+
+    if (RETEST_OUTLIERS) {
+      // todo
+      // dont forget about changes made to bestF and bestH indexing
     }
 
     labels = currentLabels.clone();
