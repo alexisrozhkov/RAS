@@ -98,6 +98,27 @@ int n1_8choose4[] = {
   5, 6, 7, 8
 };
 
+struct RAS_params {
+  int DEBUG;
+  bool POST_RANSAC;
+  EmbValT boundaryThreshold;
+
+  FindPolyMethod FITTING_METHOD;
+  InfluenceMethod INFLUENCE_METHOD;
+
+  bool NORMALIZE_DATA;
+  bool NORMALIZE_QUADRATICS;
+
+  EmbValT minOutlierPercentage;
+  EmbValT maxOutlierPercentage;
+
+  bool REJECT_UNKNOWN_OUTLIERS;
+  bool REJECT_KNOWN_OUTLIERS;
+
+  bool RETEST_OUTLIERS;
+  int plateauCountThreshold;
+};
+
 const IndexMat2D binomMat = IndexMat2D(70, 4, n1_8choose4);
 
 EmbValT chooseMiOP(const EmbValT miOP, const EmbValT maOP) {
@@ -150,17 +171,40 @@ Mat3D polyHessian(const int samplesCount,
   return hpn;
 }
 
-Mat2D clusterQuadratic(const IndexMat2D &labels,
-                       const int clusterIdx,
+template <class InputIterator, class OutputIterator, class UnaryPredicate>
+OutputIterator copy_idx_if (InputIterator first, InputIterator last,
+                        OutputIterator result, UnaryPredicate pred)
+{
+  InputIterator start = first;
+
+  while (first!=last) {
+    if (pred(*first)) {
+      *result = first-start;
+      ++result;
+    }
+    ++first;
+  }
+  return result;
+}
+
+template <class InputType, class UnaryPredicate>
+std::vector<int> filterIndices(const InputType &in, UnaryPredicate pred) {
+  std::vector<int> out(in.end() - in.begin());
+
+  auto it = copy_idx_if(in.begin(), in.end(), out.begin(), pred);
+
+  out.resize(it - out.begin());
+
+  return out;
+}
+
+Mat2D clusterQuadratic(const int clusterIdx,
+                       const IndexMat2D &labels,
                        const Mat2D &embeddedData,
                        const Mat4D &HembeddedData,
                        const bool NORMALIZE_QUADRATICS) {
-  std::vector<int> currIndices;
-  for (int i = 0; i < labels.cols; i++) {
-    if (labels(i) == clusterIdx) {
-      currIndices.push_back(i);
-    }
-  }
+  std::vector<int> currIndices =
+      filterIndices(labels, [clusterIdx](int val){return val == clusterIdx;});
 
   int clusterSize = static_cast<int>(currIndices.size());
   auto clusterData = filterIdx2(embeddedData, currIndices);
@@ -184,8 +228,8 @@ Mat2D clusterQuadratic(const IndexMat2D &labels,
 void step8(const unsigned int groupCount,
            const bool NORMALIZE_QUADRATICS,
            const Mat2D &jointImageData,
-           const cv::Mat_<EmbValT> &embeddedData,
-           const std::vector<Mat3D> &HembeddedData,
+           const Mat2D &embeddedData,
+           const Mat4D &HembeddedData,
            IndexMat2D &labels,
            int clusterCount,
            Mat3D &quadratics) {
@@ -230,26 +274,22 @@ void step8(const unsigned int groupCount,
     }
 
     {
-      std::vector<int> sampleIdx;
-      for (int i = 0; i < labels.cols; i++) {
-        if (labels(i) == clusterCount - 1) {
-          sampleIdx.push_back(i);
-        }
-      }
+      auto sampleIdx = filterIndices(labels, [clusterCount](int val) {
+                                               return val == clusterCount - 1;
+                                             });
 
       for(size_t j = 0; j < sampleIdx.size(); j++) {
         int minIdx = 0;
         EmbValT minDist = std::numeric_limits<EmbValT>::max();
-        Mat2D distance = minDist * Mat2D::ones(1, clusterCount - 1);
 
         for (int clstrIdx = 0; clstrIdx < clusterCount - 1; clstrIdx++) {
           Mat2D u1 = jointImageData.col(sampleIdx[j]);
           Mat2D u3 = u1.t() * quadratics[clstrIdx] * u1;
 
-          distance(clstrIdx) = fabs(u3(0));
+          EmbValT distance = fabs(u3(0));
 
-          if (distance(clstrIdx) < minDist) {
-            minDist = distance(clstrIdx);
+          if (distance < minDist) {
+            minDist = distance;
             minIdx = clstrIdx;
           }
         }
@@ -266,8 +306,8 @@ void step8(const unsigned int groupCount,
         continue;
       }
 
-      quadratics[clstrIdx] = clusterQuadratic(labels,
-                                              clstrIdx,
+      quadratics[clstrIdx] = clusterQuadratic(clstrIdx,
+                                              labels,
                                               embeddedData,
                                               HembeddedData,
                                               NORMALIZE_QUADRATICS);
@@ -302,7 +342,7 @@ Mat2D getJointData(const Mat2D &img1, const Mat2D &img2) {
 int ransacIter(const int sampleCount,
                const Mat2D &img1,
                const EmbValT FThreshold,
-               const cv::Mat_<EmbValT> &normedVector2,
+               const Mat2D &normedVector2,
                const Mat2D &kronImg1Img2,
                const std::vector<int> &groupDataIndices,
                Mat2D *F,
@@ -342,8 +382,7 @@ int ransacIter(const int sampleCount,
   int currentConsensus = 0;
   *currentConsensusIndices = IndexMat2D::zeros(1, sampleCount);
 
-  int idx = 0;
-  for(int i = 0; i < groupDataIndices.size(); i++) {
+  for(int i = 0; i < static_cast<int>(groupDataIndices.size()); i++) {
     currentConsensus += temp(i);
     (*currentConsensusIndices)(groupDataIndices[i]) = temp(i);
   }
@@ -379,8 +418,8 @@ Mat3D recoverQuadratics(const int clusterCount,
   Mat3D quads = Mat3D_zeros(clusterCount, dimensionCount, dimensionCount);
 
   for (int clusterIndex = 0; clusterIndex < clusterCount; clusterIndex++) {
-    quads[clusterIndex] = clusterQuadratic(labels,
-                                           clusterIndex,
+    quads[clusterIndex] = clusterQuadratic(clusterIndex,
+                                           labels,
                                            embeddedData,
                                            HembeddedData,
                                            NORMALIZE_QUADRATICS);
@@ -392,15 +431,16 @@ Mat3D recoverQuadratics(const int clusterCount,
 void step6(const unsigned int groupCount,
            const std::vector<EmbValT> &angleTolerance,
            const bool NORMALIZE_QUADRATICS,
-           int sampleCount,
-           const cv::Mat_<EmbValT> &veroneseData,
+           Mat2D &jointImageData,
+           const Mat2D &veroneseData,
+           Mat4D &veroneseHessian,
            const Mat2D &polynomialCoefficients,
            Mat2D &polynomialNormals,
-           Mat4D &veroneseHessian,
-           Mat2D &jointImageData,
-           const int angleCount,
-           IndexMat2D &allLabels,
-           IndexMat2D &labels) {
+           IndexMat2D &labels,
+           IndexMat2D &allLabels) {
+  const int sampleCount = jointImageData.cols;
+  const int angleCount = static_cast<int>(angleTolerance.size());
+
   allLabels = -1*IndexMat2D::ones(angleCount, sampleCount);
 
   Mat2D t1, t2, t3, t4;
@@ -516,45 +556,45 @@ void step6(const unsigned int groupCount,
   }
 }
 
-void step3(const int DEBUG,
-           const EmbValT boundaryThreshold,
-           const FindPolyMethod FITTING_METHOD,
-           const InfluenceMethod INFLUENCE_METHOD,
-           const EmbValT minOutlierPercentage,
-           const EmbValT maxOutlierPercentage,
-           const bool REJECT_UNKNOWN_OUTLIERS,
-           const bool REJECT_KNOWN_OUTLIERS,
-           Mat3D &veroneseDerivative,
-           int &sampleCount,
-           Mat2D &jointImageData,
-           Mat2D &veroneseData,
-           Mat4D &veroneseHessian,
-           Mat2D &untrimmedData,
-           int &untrimmedSampleCount,
+void step3(const RAS_params &params,
+           const Embedding &embedding,
+           const Mat2D &jointImageData,
            Mat2D &polynomialCoefficients,
            Mat2D &polynomialNormals,
            std::vector<int> &inlierIndices,
-           EmbValT &outlierPercentage) {
-  untrimmedSampleCount = 0;
+           EmbValT &outlierPercentage,
+           int &trimmedSampleCount,
+           Mat2D &trimmedData,
+           Mat2D &trimmedVeronese,
+           Mat3D &trimmedDerivative,
+           Mat4D &trimmedHessian) {
+  const auto untrimmedVeronese = embedding.getV().back();
+  const auto untrimmedDerivative = embedding.getD().back();
+  const auto untrimmedHessian = embedding.getH().back();
 
-  Mat2D untrimmedVeronese;
-  Mat3D untrimmedDerivative;
-  Mat4D untrimmedHessian;
+  const int untrimmedSampleCount = jointImageData.cols;
 
-  std::vector<InflVal> sortedIndex(static_cast<size_t>(sampleCount));
-  std::vector<InflVal> influenceValues(static_cast<size_t>(sampleCount));
-  if (REJECT_KNOWN_OUTLIERS || REJECT_UNKNOWN_OUTLIERS) {
-    if (INFLUENCE_METHOD == InfluenceMethod::SAMPLE) {
-      polynomialCoefficients = find_polynomials(veroneseData,
-                                                veroneseDerivative,
-                                                FITTING_METHOD,
+  trimmedSampleCount = untrimmedSampleCount;
+  trimmedData = jointImageData.clone();
+  trimmedVeronese = untrimmedVeronese.clone();
+  trimmedDerivative = untrimmedDerivative;
+  trimmedHessian = untrimmedHessian;
+
+  std::vector<InflVal> sortedIndex(static_cast<size_t>(untrimmedSampleCount));
+  std::vector<InflVal> influenceValues(static_cast<size_t>(untrimmedSampleCount));
+
+  if (params.REJECT_KNOWN_OUTLIERS || params.REJECT_UNKNOWN_OUTLIERS) {
+    if (params.INFLUENCE_METHOD == InfluenceMethod::SAMPLE) {
+      polynomialCoefficients = find_polynomials(untrimmedVeronese,
+                                                untrimmedDerivative,
+                                                params.FITTING_METHOD,
                                                 1);
 
       // Reject outliers by the sample influence function
-      for (int sIdx = 0; sIdx < sampleCount; sIdx++) {
+      for (int sIdx = 0; sIdx < untrimmedSampleCount; sIdx++) {
         // compute the leave-one-out influence
-        auto U = find_polynomials(veroneseData, veroneseDerivative,
-                                  FITTING_METHOD, 1, sIdx);
+        auto U = find_polynomials(untrimmedVeronese, untrimmedDerivative,
+                                  params.FITTING_METHOD, 1, sIdx);
 
         influenceValues[sIdx] =
             InflVal(subspace_angle(polynomialCoefficients, U), sIdx);
@@ -569,72 +609,66 @@ void step3(const int DEBUG,
     sort(sortedIndex.begin(),
          sortedIndex.end(),
          sort_pred());
-
-    untrimmedData = jointImageData.clone();
-    untrimmedVeronese = veroneseData.clone();
-    untrimmedDerivative = veroneseDerivative;
-    untrimmedHessian = veroneseHessian;
-    untrimmedSampleCount = sampleCount;
   }
 
   // REJECT_UNKNOWN_OUTLIERS
-  EmbValT outlierStep = (sampleCount < 100) ?
-                        round(1.0 / sampleCount * 100) / 100 : 0.01;
+  EmbValT outlierStep = (untrimmedSampleCount < 100) ?
+                        round(1.0 / untrimmedSampleCount * 100) / 100 : 0.01;
 
   size_t numDistanceStackElem = static_cast<size_t>(
-      (maxOutlierPercentage - minOutlierPercentage)/outlierStep) + 1;
+      (params.maxOutlierPercentage - params.minOutlierPercentage)/outlierStep) + 1;
 
   std::vector<EmbValT> distanceStack(numDistanceStackElem);
-  int plateauCount = 0;
 
   int outlierIndex = 0;
   inlierIndices = std::vector<int>(sortedIndex.size());
 
-  for (outlierPercentage = minOutlierPercentage;
-       outlierPercentage <= maxOutlierPercentage;
+  for (outlierPercentage = params.minOutlierPercentage;
+       outlierPercentage <= params.maxOutlierPercentage;
        outlierPercentage += outlierStep) {
     outlierIndex += 1;
-    if (DEBUG > 0) {
+    if (params.DEBUG > 0) {
       printf("Testing outlierPercentage %d",
              static_cast<int>(floor(100 * outlierPercentage)));
     }
 
-    if (REJECT_UNKNOWN_OUTLIERS || REJECT_KNOWN_OUTLIERS) {
-      sampleCount = static_cast<int>(floor(untrimmedSampleCount *
+    if (params.REJECT_UNKNOWN_OUTLIERS || params.REJECT_KNOWN_OUTLIERS) {
+      trimmedSampleCount = static_cast<int>(floor(untrimmedSampleCount *
           (1 - outlierPercentage)));
 
-      for (int i = 0; i < sampleCount; i++) {
-        inlierIndices[i] = sortedIndex[sampleCount - 1 - i].second;
+      for (int i = 0; i < trimmedSampleCount; i++) {
+        inlierIndices[i] = sortedIndex[trimmedSampleCount - 1 - i].second;
       }
-      inlierIndices.resize(static_cast<size_t>(sampleCount));
 
-      jointImageData = filterIdx2(untrimmedData, inlierIndices);
-      veroneseData = filterIdx2(untrimmedVeronese, inlierIndices);
-      veroneseDerivative = filterIdx3(untrimmedDerivative, inlierIndices);
-      veroneseHessian = filterIdx4(untrimmedHessian, inlierIndices);
+      inlierIndices.resize(static_cast<size_t>(trimmedSampleCount));
+
+      trimmedData = filterIdx2(jointImageData, inlierIndices);
+      trimmedVeronese = filterIdx2(untrimmedVeronese, inlierIndices);
+      trimmedDerivative = filterIdx3(untrimmedDerivative, inlierIndices);
+      trimmedHessian = filterIdx4(untrimmedHessian, inlierIndices);
     }
 
-    polynomialCoefficients = find_polynomials(veroneseData,
-                                              veroneseDerivative,
-                                              FITTING_METHOD, 1);
+    polynomialCoefficients = find_polynomials(trimmedVeronese,
+                                              trimmedDerivative,
+                                              params.FITTING_METHOD, 1);
 
     ////////////////////////////////////////////////////////////////////////////
     // Step 4: Compute Derivatives and Hessians for the fitting polynomial.
-    polynomialNormals = Mat2D::zeros(dimensionCount, sampleCount);
+    polynomialNormals = Mat2D::zeros(dimensionCount, trimmedSampleCount);
 
     for (int eIdx = 0; eIdx < dimensionCount; eIdx++) {
       polynomialNormals.row(eIdx) =
-          polynomialCoefficients.t() * sliceIdx2(veroneseDerivative, eIdx);
+          polynomialCoefficients.t() * sliceIdx2(trimmedDerivative, eIdx);
     }
 
     ////////////////////////////////////////////////////////////////////////////
     // Step 5: Estimate rejection percentage via Sampson distance
 
-    if (REJECT_UNKNOWN_OUTLIERS) {
+    if (params.REJECT_UNKNOWN_OUTLIERS) {
       distanceStack[outlierIndex] = 0;
 
-      for (int inlierIndex = 0; inlierIndex < sampleCount; inlierIndex++) {
-        Mat2D prod = polynomialCoefficients.t() * veroneseData.col(inlierIndex);
+      for (int inlierIndex = 0; inlierIndex < trimmedSampleCount; inlierIndex++) {
+        Mat2D prod = polynomialCoefficients.t() * trimmedVeronese.col(inlierIndex);
         EmbValT sampsonDistance = fabs(prod(0)) /
             norm(polynomialNormals.col(inlierIndex));
 
@@ -642,12 +676,13 @@ void step3(const int DEBUG,
           distanceStack[outlierIndex] = sampsonDistance;
         }
 
-        if (sampsonDistance > boundaryThreshold && DEBUG <= 1) {
+        if (sampsonDistance > params.boundaryThreshold && params.DEBUG <= 1) {
           break;
         }
       }
 
-      if ((DEBUG <= 1) && (distanceStack[outlierIndex] <= boundaryThreshold)) {
+      if ((params.DEBUG <= 1) &&
+          (distanceStack[outlierIndex] <= params.boundaryThreshold)) {
         // One percentage below the boundary is found
         break;
       }
@@ -674,28 +709,19 @@ Mat2D kron(const Mat2D &a, const Mat2D &b) {
   return out;
 }
 
-Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
-                                    const Mat2D &img2Unnorm,
-                                    const unsigned int groupCount,
 
-                                    const EmbValT bT,
-                                    const EmbValT miOP,
-                                    const EmbValT maOP,
+RAS_params parseParams(const EmbValT bT,
+                       const EmbValT miOP,
+                       const EmbValT maOP,
 
-                                    const int debug,
-                                    const bool postRansac,
-                                    const std::vector<EmbValT> angleTolerance,
-                                    const FindPolyMethod fittingMethod,
-                                    const InfluenceMethod influenceMethod,
-                                    const bool normalizeCoordinates,
-                                    const bool normalizeQuadratics,
-                                    const bool retestOutliers) {
-  //////////////////////////////////////////////////////////////////////////////
-  // parse arguments (currently as close as possible to Matlab, should be
-  // refactored later
-  const int DEBUG = debug;
-  const bool POST_RANSAC = postRansac;
-
+                       const int debug,
+                       const bool postRansac,
+                       const std::vector<EmbValT> &angleTolerance,
+                       const FindPolyMethod fittingMethod,
+                       const InfluenceMethod influenceMethod,
+                       const bool normalizeCoordinates,
+                       const bool normalizeQuadratics,
+                       const bool retestOutliers) {
   for (size_t i = 0; i < angleTolerance.size(); i++) {
     CV_Assert(!(angleTolerance[i] < 0 || angleTolerance[i] >= CV_PI / 2));
   }
@@ -707,74 +733,104 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
   // and will be overwritten with 0
   CV_Assert(boundaryThreshold >= 0);
 
-  const FindPolyMethod FITTING_METHOD = fittingMethod;
-  const InfluenceMethod INFLUENCE_METHOD = influenceMethod;
-
   // todo: check if it is an error/typo in Matlab implementation
   // const bool NORMALIZE_COORDINATES = true;
   const bool NORMALIZE_DATA = normalizeCoordinates;
 
-  const bool NORMALIZE_QUADRATICS = normalizeQuadratics;
-
   const EmbValT minOutlierPercentage = chooseMiOP(miOP, maOP);
   const EmbValT maxOutlierPercentage = chooseMaOP(miOP, maOP);
-
-  const bool REJECT_UNKNOWN_OUTLIERS = chooseRUO(bT, miOP, maOP);
-  const bool REJECT_KNOWN_OUTLIERS = chooseRKO(miOP, maOP);
 
   CV_Assert(!(maxOutlierPercentage < 0 || maxOutlierPercentage >= 1));
   CV_Assert(!(minOutlierPercentage < 0 || minOutlierPercentage >= 1));
   CV_Assert(minOutlierPercentage <= maxOutlierPercentage);
 
-  const bool RETEST_OUTLIERS = retestOutliers;
+  
+  return {
+      debug,
+      postRansac,
+      boundaryThreshold,
+      fittingMethod,
+      influenceMethod,
+      NORMALIZE_DATA,
+      normalizeQuadratics,
+      minOutlierPercentage,
+      maxOutlierPercentage,
+      chooseRUO(bT, miOP, maOP),
+      chooseRKO(miOP, maOP),
+      retestOutliers,
+      1
+  };
+}
 
-  const int plateauCountThreshold = 1;
+Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
+                                    const Mat2D &img2Unnorm,
+                                    const unsigned int groupCount,
+
+                                    const EmbValT bT,
+                                    const EmbValT miOP,
+                                    const EmbValT maOP,
+
+                                    const int debug,
+                                    const bool postRansac,
+                                    const std::vector<EmbValT> &angleTolerance,
+                                    const FindPolyMethod fittingMethod,
+                                    const InfluenceMethod influenceMethod,
+                                    const bool normalizeCoordinates,
+                                    const bool normalizeQuadratics,
+                                    const bool retestOutliers) {
+  //////////////////////////////////////////////////////////////////////////////
+  // parse arguments (currently as close as possible to Matlab, should be
+  // refactored later
+  RAS_params params = parseParams(bT,
+                                  miOP,
+                                  maOP,
+                                  debug,
+                                  postRansac,
+                                  angleTolerance,
+                                  fittingMethod,
+                                  influenceMethod,
+                                  normalizeCoordinates,
+                                  normalizeQuadratics,
+                                  retestOutliers);
 
   //////////////////////////////////////////////////////////////////////////////
   // Step 1: map coordinates to joint image space.
-  int sampleCount = img1Unnorm.cols;
+  const Mat2D img1 = normalizeCoords(img1Unnorm, params.NORMALIZE_DATA);
+  const Mat2D img2 = normalizeCoords(img2Unnorm, params.NORMALIZE_DATA);
 
-  const Mat2D img1 = normalizeCoords(img1Unnorm, NORMALIZE_DATA);
-  const Mat2D img2 = normalizeCoords(img2Unnorm, NORMALIZE_DATA);
-
-  Mat2D jointImageData = getJointData(img1, img2);
+  const Mat2D jointImageData = getJointData(img1, img2);
 
   //////////////////////////////////////////////////////////////////////////////
   // Step 2: apply perspective veronese map to data
-  auto embedding = perspective_embedding(jointImageData, groupCount, false);
-  auto veroneseData = embedding.getV().back();
-  auto veroneseDerivative = embedding.getD().back();
-  auto veroneseHessian = embedding.getH().back();
+  const Embedding embedding = perspective_embedding(jointImageData,
+                                                    groupCount, false);
 
   //////////////////////////////////////////////////////////////////////////////
   // Step 3: Use influence function to perform robust pcaMat2D untrimmedData;
-  int untrimmedSampleCount;
   Mat2D polynomialCoefficients;
   Mat2D polynomialNormals;
+
   std::vector<int> inlierIndices;
   EmbValT outlierPercentage;
 
-  Mat2D untrimmedData;
+  int trimmedSampleCount;
+  Mat2D trimmedData;
+  Mat2D trimmedVeronese;
+  Mat3D trimmedDerivative;
+  Mat4D trimmedHessian;
 
-  step3(DEBUG,
-        boundaryThreshold,
-        FITTING_METHOD,
-        INFLUENCE_METHOD,
-        minOutlierPercentage,
-        maxOutlierPercentage,
-        REJECT_UNKNOWN_OUTLIERS,
-        REJECT_KNOWN_OUTLIERS,
-        veroneseDerivative,
-        sampleCount,
+  step3(params,
+        embedding,
         jointImageData,
-        veroneseData,
-        veroneseHessian,
-        untrimmedData,
-        untrimmedSampleCount,
         polynomialCoefficients,
         polynomialNormals,
         inlierIndices,
-        outlierPercentage);
+        outlierPercentage,
+        trimmedSampleCount,
+        trimmedData,
+        trimmedVeronese,
+        trimmedDerivative,
+        trimmedHessian);
 
   //////////////////////////////////////////////////////////////////////////////
   // Step 6: Compute Tangent Spaces and Mutual Contractions. Use Mutual
@@ -782,24 +838,21 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
   // particular algorithm tries to oversegment the sample by using a
   // conservative tolerance.
 
-  const int angleCount = static_cast<int>(angleTolerance.size());
   IndexMat2D labels, allLabels;
 
   step6(groupCount,
         angleTolerance,
-        NORMALIZE_QUADRATICS,
-        sampleCount,
-        veroneseData,
+        params.NORMALIZE_QUADRATICS,
+        trimmedData,
+        trimmedVeronese,
+        trimmedHessian,
         polynomialCoefficients,
         polynomialNormals,
-        veroneseHessian,
-        jointImageData,
-        angleCount,
-        allLabels,
-        labels);
+        labels,
+        allLabels);
 
-  // std::cout << labels+1 << std::endl;
-  //return labels;
+  const int sampleCount = jointImageData.cols;
+  const int angleCount = static_cast<int>(angleTolerance.size());
 
   if (angleCount != 1) {
     // todo:
@@ -808,9 +861,9 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
     //std::cout << labels+1 << std::endl;
   }
 
-  if (REJECT_UNKNOWN_OUTLIERS || REJECT_KNOWN_OUTLIERS) {
+  if (params.REJECT_UNKNOWN_OUTLIERS || params.REJECT_KNOWN_OUTLIERS) {
     IndexMat2D untrimmedAllLabels = -1*IndexMat2D::ones(angleCount,
-                                        untrimmedSampleCount);
+                                                        sampleCount);
 
     for (int i = 0; i < static_cast<int>(inlierIndices.size()); i++) {
       allLabels.col(i).copyTo(untrimmedAllLabels.col(inlierIndices[i]));
@@ -818,19 +871,19 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
 
     allLabels = untrimmedAllLabels;
 
-    IndexMat2D untrimmedLabels = -1*IndexMat2D::ones(1, untrimmedSampleCount);
+    IndexMat2D untrimmedLabels = -1*IndexMat2D::ones(1, sampleCount);
 
     for (int i = 0; i < static_cast<int>(inlierIndices.size()); i++) {
       untrimmedLabels(inlierIndices[i]) = labels(i);
     }
 
-    labels = untrimmedLabels;
-
-    jointImageData = untrimmedData;
-    sampleCount = untrimmedSampleCount;
+    labels = untrimmedLabels.clone();
+    trimmedData = jointImageData.clone();
+    trimmedSampleCount = sampleCount;
   }
 
-  if (REJECT_UNKNOWN_OUTLIERS && outlierPercentage >= maxOutlierPercentage) {
+  if (params.REJECT_UNKNOWN_OUTLIERS &&
+      outlierPercentage >= params.maxOutlierPercentage) {
     std::cout << "The RHQA function did not find an mixed motion model "\
                  "within the boundary threshold." << std::endl;
   }
@@ -841,18 +894,18 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
   // After the refinement, resegment the data based on the motion model.
 
   IndexMat2D motionModels = IndexMat2D::zeros(1, groupCount);
-  IndexMat2D isGroupOutliers = IndexMat2D::zeros(groupCount, sampleCount);
+  IndexMat2D isGroupOutliers = IndexMat2D::zeros(groupCount, trimmedSampleCount);
 
-  if (POST_RANSAC) {
+  if (params.POST_RANSAC) {
     const int RANSACIteration = 10;
     const EmbValT FThreshold = 0.035;  // FThreshold = 0.015;
     const EmbValT HAngleThreshold = 0.04;
 
 
-    IndexMat2D currentLabels = -2*IndexMat2D::ones(1, sampleCount);
+    IndexMat2D currentLabels = -2*IndexMat2D::ones(1, trimmedSampleCount);
 
     auto normedVector2 = img2.clone();
-    for (int sampleIdx = 0; sampleIdx < sampleCount; sampleIdx++) {
+    for (int sampleIdx = 0; sampleIdx < trimmedSampleCount; sampleIdx++) {
       normedVector2.col(sampleIdx) /= cv::norm(normedVector2.col(sampleIdx));
     }
 
@@ -899,7 +952,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
 
         Mat2D F;
         IndexMat2D currentConsensusIndices;
-        int currentConsensus = ransacIter(sampleCount,
+        int currentConsensus = ransacIter(trimmedSampleCount,
                                           img1,
                                           FThreshold,
                                           normedVector2,
@@ -976,9 +1029,9 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
            */
 
           int currentConsensus = 0;
-          IndexMat2D currentConsensusIndices = IndexMat2D::zeros(1, sampleCount);
+          IndexMat2D currentConsensusIndices = IndexMat2D::zeros(1, trimmedSampleCount);
 
-          for (int sampleIndex = 0; sampleIndex < sampleCount;
+          for (int sampleIndex = 0; sampleIndex < trimmedSampleCount;
               sampleIndex++) {
             if (maxFConsensusIndices(sampleIndex)) {
               Mat2D normedVector1 = H*img1.col(sampleIndex);
@@ -1050,7 +1103,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
       }
     }
 
-    if (RETEST_OUTLIERS) {
+    if (params.RETEST_OUTLIERS) {
       // todo
       // dont forget about changes made to bestF and bestH indexing
     }
@@ -1062,5 +1115,5 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
   std::cout << motionModels << std::endl;
   std::cout << isGroupOutliers << std::endl;
 
-  return veroneseData;
+  return Mat2D();
 }

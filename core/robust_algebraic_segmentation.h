@@ -30,7 +30,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1,
 
                                     const int debug = 0,
                                     const bool postRansac = true,
-                                    const std::vector<EmbValT> angleTolerance =
+                                    const std::vector<EmbValT> &angleTolerance =
                                         {CV_PI/60},
                                     const FindPolyMethod fittingMethod =
                                           FindPolyMethod::FISHER,
