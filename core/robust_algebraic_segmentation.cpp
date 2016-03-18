@@ -98,60 +98,8 @@ int n1_8choose4[] = {
   5, 6, 7, 8
 };
 
-struct RAS_params {
-  int DEBUG;
-  bool POST_RANSAC;
-  EmbValT boundaryThreshold;
-
-  FindPolyMethod FITTING_METHOD;
-  InfluenceMethod INFLUENCE_METHOD;
-
-  bool NORMALIZE_DATA;
-  bool NORMALIZE_QUADRATICS;
-
-  EmbValT minOutlierPercentage;
-  EmbValT maxOutlierPercentage;
-
-  bool REJECT_UNKNOWN_OUTLIERS;
-  bool REJECT_KNOWN_OUTLIERS;
-
-  bool RETEST_OUTLIERS;
-  int plateauCountThreshold;
-};
-
 const IndexMat2D binomMat = IndexMat2D(70, 4, n1_8choose4);
 
-EmbValT chooseMiOP(const EmbValT miOP, const EmbValT maOP) {
-  const EmbValT defaultVal = 0;
-
-  if (miOP == NotSpecified) {  // nothing given
-    return defaultVal;
-  } else {  // one or two values given
-    return miOP;
-  }
-}
-
-EmbValT chooseMaOP(const EmbValT miOP, const EmbValT maOP) {
-  const EmbValT defaultVal = 0.5;
-
-  if (miOP == NotSpecified) {  // nothing given
-    return defaultVal;
-  } else if (maOP == NotSpecified) {  // one value given
-    return miOP;
-  } else {
-    return maOP;  // range given
-  }
-}
-
-bool chooseRKO(const EmbValT miOP, const EmbValT maOP) {
-  return (miOP > 0) && (maOP == NotSpecified);
-}
-
-bool chooseRUO(const EmbValT boundaryThreshold,
-               const EmbValT miOP, const EmbValT maOP) {
-  return boundaryThreshold != NotSpecified ||
-      ((miOP != NotSpecified) && (maOP != NotSpecified));
-}
 
 Mat3D polyHessian(const int samplesCount,
                   const Mat2D &coeffs,
@@ -225,87 +173,77 @@ Mat2D clusterQuadratic(const int clusterIdx,
   return quad;
 }
 
+inline EmbValT ptQuadDist(const Mat2D &u1, const Mat2D &quad) {
+  Mat2D val = u1.t() * quad * u1;
+  return fabs(val(0));
+}
+
 void step8(const unsigned int groupCount,
            const bool NORMALIZE_QUADRATICS,
            const Mat2D &jointImageData,
            const Mat2D &embeddedData,
            const Mat4D &HembeddedData,
            IndexMat2D &labels,
-           int clusterCount,
            Mat3D &quadratics) {
+  int clusterCount = static_cast<int>(quadratics.size());
+
   while (clusterCount > static_cast<int>(groupCount)) {
-    std::vector<int> cSampleCounts(static_cast<size_t>(clusterCount));
+    // count number of points in clusters
+    std::vector<int> num(static_cast<size_t>(clusterCount));
     for (int i = 0; i < labels.cols; i++) {
-      cSampleCounts[labels(i)] += 1;
+      num[labels(i)] += 1;
     }
 
-    int minVal = std::numeric_limits<int>::max(), smallestClust = 0;
-    for (int i = 0; i < clusterCount; i++) {
-      if (cSampleCounts[i] < minVal) {
-        minVal = cSampleCounts[i];
-        smallestClust = i;
-      }
-    }
+    // find smallest cluster
+    int smallestClust = std::min_element(num.begin(), num.end()) - num.begin();
 
-    IndexMat2D clusterChanged = IndexMat2D::zeros(1, clusterCount-1);
-
+    // swap last cluster with smallest
     if (smallestClust != clusterCount-1) {
       for (int i = 0; i < labels.cols; i++) {
+        // swap smallestClust and clusterCount-1 labels
         if (labels(i) == smallestClust) {
-          labels(i) = -1;
-        }
-      }
-
-      for (int i = 0; i < labels.cols; i++) {
-        if (labels(i) == clusterCount-1) {
+          labels(i) = clusterCount-1;
+        } else if (labels(i) == clusterCount-1) {
           labels(i) = smallestClust;
         }
       }
 
-      for (int i = 0; i < labels.cols; i++) {
-        if (labels(i) == -1) {
-          labels(i) = clusterCount-1;
-        }
-      }
-
-      Mat2D temp = quadratics[smallestClust].clone();
-      quadratics[smallestClust] = quadratics[clusterCount-1];
-      quadratics[clusterCount-1] = temp;
+      // swap smallestClust and clusterCount-1 quadratics
+      std::swap(quadratics[smallestClust], quadratics[clusterCount-1]);
     }
 
-    {
-      auto sampleIdx = filterIndices(labels, [clusterCount](int val) {
-                                               return val == clusterCount - 1;
-                                             });
+    std::vector<int> clusterChanged;
 
-      for(size_t j = 0; j < sampleIdx.size(); j++) {
-        int minIdx = 0;
-        EmbValT minDist = std::numeric_limits<EmbValT>::max();
-
-        for (int clstrIdx = 0; clstrIdx < clusterCount - 1; clstrIdx++) {
-          Mat2D u1 = jointImageData.col(sampleIdx[j]);
-          Mat2D u3 = u1.t() * quadratics[clstrIdx] * u1;
-
-          EmbValT distance = fabs(u3(0));
-
-          if (distance < minDist) {
-            minDist = distance;
-            minIdx = clstrIdx;
-          }
-        }
-
-        labels(sampleIdx[j]) = minIdx;
-        clusterChanged(labels(sampleIdx[j])) = 1;
+    // reassign points from last(smallest) cluster to other clusters
+    for (int j = 0; j < labels.cols; j++) {
+      if (labels(j) != clusterCount - 1) {
+        continue;
       }
+
+      Mat2D pt = jointImageData.col(j);
+
+      // find closest cluster
+      int minIdx = 0;
+      EmbValT minDist = std::numeric_limits<EmbValT>::max();
+
+      for (int clstrIdx = 0; clstrIdx < clusterCount - 1; clstrIdx++) {
+        EmbValT distance = ptQuadDist(pt, quadratics[clstrIdx]);
+
+        if (distance < minDist) {
+          minDist = distance;
+          minIdx = clstrIdx;
+        }
+      }
+
+      // move points from last cluster to the closest, mark it as updated
+      labels(j) = minIdx;
+      clusterChanged.push_back(minIdx);
     }
 
     clusterCount -= 1;
 
-    for (int clstrIdx = 0; clstrIdx < clusterCount; clstrIdx++) {
-      if (!clusterChanged(clstrIdx)) {
-        continue;
-      }
-
+    // recalculate updated clusters
+    for (int clstrIdx : clusterChanged) {
       quadratics[clstrIdx] = clusterQuadratic(clstrIdx,
                                               labels,
                                               embeddedData,
@@ -313,6 +251,8 @@ void step8(const unsigned int groupCount,
                                               NORMALIZE_QUADRATICS);
     }
   }
+
+  quadratics.resize(groupCount);
 }
 
 Mat2D normalizeCoords(const Mat2D &coords, const bool NORMALIZE_DATA) {
@@ -544,7 +484,6 @@ void step6(const unsigned int groupCount,
           embeddedData,
           HembeddedData,
           labels,
-          clusterCount,
           quadratics);
 
     auto labelsCopy = labels.clone();
@@ -710,89 +649,12 @@ Mat2D kron(const Mat2D &a, const Mat2D &b) {
 }
 
 
-RAS_params parseParams(const EmbValT bT,
-                       const EmbValT miOP,
-                       const EmbValT maOP,
 
-                       const int debug,
-                       const bool postRansac,
-                       const std::vector<EmbValT> &angleTolerance,
-                       const FindPolyMethod fittingMethod,
-                       const InfluenceMethod influenceMethod,
-                       const bool normalizeCoordinates,
-                       const bool normalizeQuadratics,
-                       const bool retestOutliers) {
-  for (size_t i = 0; i < angleTolerance.size(); i++) {
-    CV_Assert(!(angleTolerance[i] < 0 || angleTolerance[i] >= CV_PI / 2));
-  }
-
-  // todo: handle unspecified value of boundaryThreshold more gracefully
-  const EmbValT boundaryThreshold = (bT == NotSpecified) ? 0 : bT;
-
-  // will not complain if boundaryThreshold_ was -1, since it's a default value
-  // and will be overwritten with 0
-  CV_Assert(boundaryThreshold >= 0);
-
-  // todo: check if it is an error/typo in Matlab implementation
-  // const bool NORMALIZE_COORDINATES = true;
-  const bool NORMALIZE_DATA = normalizeCoordinates;
-
-  const EmbValT minOutlierPercentage = chooseMiOP(miOP, maOP);
-  const EmbValT maxOutlierPercentage = chooseMaOP(miOP, maOP);
-
-  CV_Assert(!(maxOutlierPercentage < 0 || maxOutlierPercentage >= 1));
-  CV_Assert(!(minOutlierPercentage < 0 || minOutlierPercentage >= 1));
-  CV_Assert(minOutlierPercentage <= maxOutlierPercentage);
-
-  
-  return {
-      debug,
-      postRansac,
-      boundaryThreshold,
-      fittingMethod,
-      influenceMethod,
-      NORMALIZE_DATA,
-      normalizeQuadratics,
-      minOutlierPercentage,
-      maxOutlierPercentage,
-      chooseRUO(bT, miOP, maOP),
-      chooseRKO(miOP, maOP),
-      retestOutliers,
-      1
-  };
-}
 
 Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
                                     const Mat2D &img2Unnorm,
                                     const unsigned int groupCount,
-
-                                    const EmbValT bT,
-                                    const EmbValT miOP,
-                                    const EmbValT maOP,
-
-                                    const int debug,
-                                    const bool postRansac,
-                                    const std::vector<EmbValT> &angleTolerance,
-                                    const FindPolyMethod fittingMethod,
-                                    const InfluenceMethod influenceMethod,
-                                    const bool normalizeCoordinates,
-                                    const bool normalizeQuadratics,
-                                    const bool retestOutliers) {
-  //////////////////////////////////////////////////////////////////////////////
-  // parse arguments (currently as close as possible to Matlab, should be
-  // refactored later
-  RAS_params params = parseParams(bT,
-                                  miOP,
-                                  maOP,
-                                  debug,
-                                  postRansac,
-                                  angleTolerance,
-                                  fittingMethod,
-                                  influenceMethod,
-                                  normalizeCoordinates,
-                                  normalizeQuadratics,
-                                  retestOutliers);
-
+                                    const RAS_params &params) {
   //////////////////////////////////////////////////////////////////////////////
   // Step 1: map coordinates to joint image space.
   const Mat2D img1 = normalizeCoords(img1Unnorm, params.NORMALIZE_DATA);
@@ -841,7 +703,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
   IndexMat2D labels, allLabels;
 
   step6(groupCount,
-        angleTolerance,
+        params.angleTolerance,
         params.NORMALIZE_QUADRATICS,
         trimmedData,
         trimmedVeronese,
@@ -852,7 +714,7 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
         allLabels);
 
   const int sampleCount = jointImageData.cols;
-  const int angleCount = static_cast<int>(angleTolerance.size());
+  const int angleCount = static_cast<int>(params.angleTolerance.size());
 
   if (angleCount != 1) {
     // todo:
@@ -1006,19 +868,18 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
           Mat2D Hstacked = V.col(V.cols-1).clone();
           Mat2D H = Hstacked.reshape(0, 3).t();
 
+          // todo: look more carefully - why would someone want to normalize
+          // sign of homography matrix, which is defined up to scale?
+
+          /*
           Mat2D S;
           armaSVD_S(H, &S);
 
           H /= S(1, 1);
 
-          if(H(2,2) < 0) H *= -1;
+         // 3.2. normalize the sign of matrix H
 
-
-          // todo: look more carefully - why would someone want to normalize
-          // sign of homography matrix, which is defined up to scale?
-          // 3.2. normalize the sign of matrix H
-          /*
-          IndexMat2D signArray = IndexMat2D::zeros(1, HSampleSize);
+         IndexMat2D signArray = IndexMat2D::zeros(1, HSampleSize);
           for (int sampleIndex=0; sampleIndex < HSampleSize; sampleIndex++) {
           signArray(sampleIndex) = sign(img2(:,currentDataIndices(sampleIndex)).'*H*img1(:,currentDataIndices(sampleIndex)));
           }

@@ -18,6 +18,7 @@ add_library(RAS STATIC
             utils/subspace_angle.cpp
             utils/jacobi_svd.cpp
             utils/arma_svd.cpp
+            utils/ras_params.cpp
             perspective_embedding.cpp
             find_polynomials.cpp
             robust_algebraic_segmentation.cpp)
