@@ -1,10 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
 
-add_definitions(-std=c++11)
-
-find_package(OpenCV REQUIRED)
-find_package(Armadillo REQUIRED)
-
 include_directories(${OpenCV_INCLUDE_DIRS}
                     ${ARMADILLO_INCLUDE_DIRS}
                     ${PROJECT_SOURCE_DIR})

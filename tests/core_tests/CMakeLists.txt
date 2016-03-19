@@ -1,5 +1,6 @@
 include_directories(${gtest_SOURCE_DIR}/include
                     ${gtest_SOURCE_DIR}
+                    ${OpenCV_INCLUDE_DIRS}
                     ${PROJECT_SOURCE_DIR})
 
 add_executable(runCoreTests
