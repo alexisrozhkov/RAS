@@ -14,6 +14,9 @@
 
 static const int HSampleSize = 4;
 static const int FSampleSize = 8;
+static const EmbValT FThreshold = 0.035;  // FThreshold = 0.015;
+static const EmbValT HAngleThreshold = 0.04;
+
 static const int dimensionCount = 5;
 
 // utils
@@ -518,6 +521,29 @@ void step6(const unsigned int groupCount,
   }
 }
 
+bool checkThreshold(const Mat2D &polynomialCoefficients,
+                    const Mat2D &polynomialNormals,
+                    const Mat2D &trimmedVeronese,
+                    const RAS_params &params) {
+  EmbValT maxDistance = 0;
+
+  for (int i = 0; i < trimmedVeronese.cols; i++) {
+    Mat2D prod = polynomialCoefficients.t() * trimmedVeronese.col(i);
+    EmbValT currDistance = fabs(prod(0)) / norm(polynomialNormals.col(i));
+
+    if (currDistance > maxDistance) {
+      maxDistance = currDistance;
+    }
+
+    if (currDistance > params.boundaryThreshold && params.DEBUG <= 1) {
+      break;
+    }
+  }
+
+  // check if percentage below the boundary has been found
+  return (params.DEBUG <= 1) && (maxDistance <= params.boundaryThreshold);
+}
+
 EmbValT estimateOutliers(const RAS_params &params,
                          const Embedding &embedding,
                          const Mat2D &jointImageData,
@@ -570,9 +596,6 @@ EmbValT estimateOutliers(const RAS_params &params,
   EmbValT outlierStep = (untrimmedSampleCount < 100) ?
                         round(1.0 / untrimmedSampleCount * 100) / 100 : 0.01;
 
-  size_t numDistanceStackElem = static_cast<size_t>(
-      (params.maxOutlierPercentage - params.minOutlierPercentage)/outlierStep) + 1;
-  
   int outlierIndex = 0;
   inlierIndices = std::vector<int>(influence.size());
 
@@ -617,29 +640,11 @@ EmbValT estimateOutliers(const RAS_params &params,
 
     ////////////////////////////////////////////////////////////////////////////
     // Step 5: Estimate rejection percentage via Sampson distance
-
-    std::vector<EmbValT> distanceStack(numDistanceStackElem);
-
     if (params.REJECT_UNKNOWN_OUTLIERS) {
-      distanceStack[outlierIndex] = 0;
-
-      for (int inlierIndex = 0; inlierIndex < trimmedSampleCount; inlierIndex++) {
-        Mat2D prod = polynomialCoefficients.t() * trimmedVeronese.col(inlierIndex);
-        EmbValT sampsonDistance = fabs(prod(0)) /
-            norm(polynomialNormals.col(inlierIndex));
-
-        if (sampsonDistance > distanceStack[outlierIndex]) {
-          distanceStack[outlierIndex] = sampsonDistance;
-        }
-
-        if (sampsonDistance > params.boundaryThreshold && params.DEBUG <= 1) {
-          break;
-        }
-      }
-
-      if ((params.DEBUG <= 1) &&
-          (distanceStack[outlierIndex] <= params.boundaryThreshold)) {
-        // One percentage below the boundary is found
+      if (checkThreshold(polynomialCoefficients,
+                         polynomialNormals,
+                         trimmedVeronese,
+                         params)) {
         break;
       }
     }
@@ -648,17 +653,92 @@ EmbValT estimateOutliers(const RAS_params &params,
   return outlierPercentage;
 }
 
-IndexMat2D postRansac(const Mat2D &img1, const Mat2D &img2, const RAS_params &params,
-                      const IndexMat2D &labels, IndexMat2D &motionModels) {
+int checkDegenerateF(const Mat2D &img1,
+                     const Mat2D &img2,
+                     const Mat2D &normedVector2,
+                     const std::vector<int> &maxFGroupDataIndices,
+                     const IndexMat2D &maxFConsensusIndices,
+                     IndexMat2D &maxHConsensusIndices,
+                     Mat2D &bestH) {
+  const int sampleCount = img1.cols;
+
+  int maxHConsensus = 0;
+
+  IndexMat2D allCombinations = binomMat - 1;
+  for (int permutationIndex = 0; permutationIndex < allCombinations.rows;
+       permutationIndex++) {
+    // Step 1: Recover an H matrix
+    auto indicesMat = allCombinations.row(permutationIndex);
+    std::vector<int> currentDataIndices(indicesMat.cols);
+
+    for (int i = 0; i < indicesMat.cols; i++) {
+      currentDataIndices[i] =
+              maxFGroupDataIndices[allCombinations(permutationIndex, i)];
+    }
+
+    Mat2D A = Mat2D::zeros(3 * HSampleSize, 9);
+
+    for (int sampleIndex = 0; sampleIndex < HSampleSize; sampleIndex++) {
+      auto t1 = img1.col(currentDataIndices[sampleIndex]);
+      auto t2 = img2.col(currentDataIndices[sampleIndex]);
+      Mat2D t3 = kron(t1, hat(t2)).t();
+      t3.copyTo(A(cv::Rect(0, sampleIndex * 3, t3.cols, t3.rows)));
+    }
+
+    Mat2D V;
+    armaSVD_V(A, &V);
+
+    // Step 2: Compute a consensus among all group samples
+    Mat2D Hstacked = V.col(V.cols - 1).clone();
+    Mat2D H = Hstacked.reshape(0, 3).t();
+
+    // todo: look more carefully - why would someone want to normalize
+    // scale and sign of homography matrix, which is defined up to scale?
+
+    int currentConsensus = 0;
+    IndexMat2D currentConsensusIndices = IndexMat2D::zeros(1, sampleCount);
+
+    for (int sampleIndex = 0; sampleIndex < sampleCount;
+         sampleIndex++) {
+      if (maxFConsensusIndices(sampleIndex)) {
+        Mat2D normedVector1 = H * img1.col(sampleIndex);
+        normedVector1 /= norm(normedVector1);
+
+
+        Mat2D tempm = normedVector2.col(sampleIndex).t() * normedVector1;
+
+        EmbValT acosVal = 0;
+        if (fabs(tempm(0)) < 1) {
+          acosVal = acos(fabs(tempm(0)));
+        }
+
+        if (acosVal < HAngleThreshold) {
+          // Two vectors are parallel, hit one consensus
+          currentConsensus += 1;
+          currentConsensusIndices(0, sampleIndex) = 1;
+        }
+      }
+    }
+
+    if (currentConsensus > maxHConsensus) {
+      maxHConsensus = currentConsensus;
+      maxHConsensusIndices = currentConsensusIndices.clone();
+      bestH = H.clone();
+    }
+  }
+
+  return maxHConsensus;
+}
+
+IndexMat2D postRansac(const Mat2D &img1,
+                      const Mat2D &img2,
+                      const RAS_params &params,
+                      const IndexMat2D &labels,
+                      IndexMat2D &motionModels) {
   const int sampleCount = img1.cols;
   const int groupCount = motionModels.cols;
 
-  IndexMat2D isGroupOutliers = IndexMat2D::zeros(groupCount, sampleCount);
-
   const int RANSACIteration = 10;
-  const EmbValT FThreshold = 0.035;  // FThreshold = 0.015;
-  const EmbValT HAngleThreshold = 0.04;
-
 
   IndexMat2D currentLabels = -2 * IndexMat2D::ones(1, sampleCount);
 
@@ -676,14 +756,11 @@ IndexMat2D postRansac(const Mat2D &img1, const Mat2D &img2, const RAS_params &pa
 
   std::vector<int> maxFGroupDataIndices;
 
-  for (int grpIdx = 0; grpIdx < static_cast<int>(groupCount); grpIdx++) {
-    std::vector<int> groupDataIndices;
+  IndexMat2D isGroupOutliers = IndexMat2D::zeros(groupCount, sampleCount);
 
-    for (int i = 0; i < labels.cols; i++) {
-      if (labels(i) == grpIdx) {
-        groupDataIndices.push_back(i);
-      }
-    }
+  for (int grpIdx = 0; grpIdx < groupCount; grpIdx++) {
+    std::vector<int> groupDataIndices =
+            filterIndices(labels, [grpIdx](int val){return val == grpIdx;});
 
     int maxFConsensus = 0;
     int maxHConsensus = 0;
@@ -721,10 +798,10 @@ IndexMat2D postRansac(const Mat2D &img1, const Mat2D &img2, const RAS_params &pa
 
       if (currentConsensus > maxFConsensus) {
         maxFConsensus = currentConsensus;
-        maxFConsensusIndices = currentConsensusIndices;
+        maxFConsensusIndices = currentConsensusIndices.clone();
 
-        maxFGroupDataIndices = std::vector<int>(groupDataIndices.begin() + iterationIndex,
-                                                groupDataIndices.begin() + (iterationIndex + FSampleSize));
+        maxFGroupDataIndices = std::vector<int>(groupDataIndices.begin(),
+                                                groupDataIndices.begin() + FSampleSize);
 
         bestF[grpIdx] = F;
       }
@@ -734,90 +811,13 @@ IndexMat2D postRansac(const Mat2D &img1, const Mat2D &img2, const RAS_params &pa
 
     if (maxFConsensus > 0) {
       // Further verify if the F is a degenerate H relation
-      IndexMat2D allCombinations = binomMat-1;
-      maxHConsensus = 0;
-
-      for (int permutationIndex=0; permutationIndex < allCombinations.rows;
-        permutationIndex++) {
-        // Step 1: Recover an H matrix
-        auto indicesMat = allCombinations.row(permutationIndex);
-        std::vector<int> currentDataIndices(indicesMat.cols);
-
-        for(int i = 0; i < indicesMat.cols; i++) {
-          currentDataIndices[i] =
-              maxFGroupDataIndices[allCombinations(permutationIndex, i)];
-        }
-
-        Mat2D A = Mat2D::zeros(3 * HSampleSize, 9);
-
-        for (int sampleIndex = 0; sampleIndex < HSampleSize; sampleIndex++) {
-          auto t1 = img1.col(currentDataIndices[sampleIndex]);
-          auto t2 = img2.col(currentDataIndices[sampleIndex]);
-          Mat2D t3 = kron(t1, hat(t2)).t();
-          t3.copyTo(A(cv::Rect(0, sampleIndex * 3, t3.cols, t3.rows)));
-        }
-
-        Mat2D V;
-        armaSVD_V(A, &V);
-
-        // Step 2: Compute a consensus among all group samples
-        Mat2D Hstacked = V.col(V.cols-1).clone();
-        Mat2D H = Hstacked.reshape(0, 3).t();
-
-        // todo: look more carefully - why would someone want to normalize
-        // sign of homography matrix, which is defined up to scale?
-
-        /*
-        Mat2D S;
-        armaSVD_S(H, &S);
-
-        H /= S(1, 1);
-
-       // 3.2. normalize the sign of matrix H
-
-       IndexMat2D signArray = IndexMat2D::zeros(1, HSampleSize);
-        for (int sampleIndex=0; sampleIndex < HSampleSize; sampleIndex++) {
-        signArray(sampleIndex) = sign(img2(:,currentDataIndices(sampleIndex)).'*H*img1(:,currentDataIndices(sampleIndex)));
-        }
-
-        if (sum(signArray)<0){
-          H = -H;
-        }
-         */
-
-        int currentConsensus = 0;
-        IndexMat2D currentConsensusIndices = IndexMat2D::zeros(1, sampleCount);
-
-        for (int sampleIndex = 0; sampleIndex < sampleCount;
-            sampleIndex++) {
-          if (maxFConsensusIndices(sampleIndex)) {
-            Mat2D normedVector1 = H*img1.col(sampleIndex);
-            normedVector1 /= norm(normedVector1);
-
-
-            Mat2D tempm = normedVector2.col(sampleIndex).t() *
-                          normedVector1;
-
-            EmbValT acosVal = 0;
-            if(fabs(tempm(0)) < 1) {
-              acosVal = acos(fabs(tempm(0)));
-            }
-            //std::cout << acosVal << std::endl << std::endl;
-
-            if(acosVal < HAngleThreshold) {
-              // Two vectors are parallel, hit one consensus
-              currentConsensus += 1;
-              currentConsensusIndices(0, sampleIndex) = 1;
-            }
-          }
-        }
-
-        if (currentConsensus > maxHConsensus) {
-          maxHConsensus = currentConsensus;
-          maxHConsensusIndices = currentConsensusIndices.clone();
-          bestH[grpIdx] = H;
-        }
-      }
+      maxHConsensus = checkDegenerateF(img1,
+                                       img2,
+                                       normedVector2,
+                                       maxFGroupDataIndices,
+                                       maxFConsensusIndices,
+                                       maxHConsensusIndices,
+                                       bestH[grpIdx]);
     }
 
     // Finally assign labels and mode
@@ -926,6 +926,12 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
                                                      trimmedDerivative,
                                                      trimmedHessian);
 
+  if (params.REJECT_UNKNOWN_OUTLIERS &&
+      outlierPercentage >= params.maxOutlierPercentage) {
+    std::cout << "The RHQA function did not find an mixed motion model "
+                 "within the boundary threshold." << std::endl;
+  }
+
   //////////////////////////////////////////////////////////////////////////////
   // Step 6: Compute Tangent Spaces and Mutual Contractions. Use Mutual
   // Contractions as a similarity metric for spectral clustering. This
@@ -945,26 +951,23 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
         trimmedLabels,
         trimmedAllLabels);
 
-
-  const int angleCount = static_cast<int>(params.angleTolerance.size());
-
-  if (angleCount != 1) {
+  if (params.angleTolerance.size() != 1) {
     // todo:
-    //std::cout << trimmedLabels+1 << std::endl;
+    // std::cout << trimmedLabels+1 << std::endl;
     // trimmedLabels = aggregate_labels(trimmedAllLabels, groupCount);
-    //std::cout << trimmedLabels+1 << std::endl;
+    // std::cout << trimmedLabels+1 << std::endl;
   }
 
   const int sampleCount = jointImageData.cols;
 
-  IndexMat2D labels = recomposeLabels(sampleCount, trimmedLabels, inlierIndices, params),
-          allLabels = recomposeLabels(sampleCount, trimmedAllLabels, inlierIndices, params);
-
-  if (params.REJECT_UNKNOWN_OUTLIERS &&
-      outlierPercentage >= params.maxOutlierPercentage) {
-    std::cout << "The RHQA function did not find an mixed motion model "\
-                 "within the boundary threshold." << std::endl;
-  }
+  IndexMat2D labels = recomposeLabels(sampleCount,
+                                      trimmedLabels,
+                                      inlierIndices,
+                                      params),
+          allLabels = recomposeLabels(sampleCount,
+                                      trimmedAllLabels,
+                                      inlierIndices,
+                                      params);
 
   //////////////////////////////////////////////////////////////////////////////
   // Step 9: Post-refinement using RANSAC
