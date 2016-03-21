@@ -2,7 +2,6 @@
 
 #include <core/utils/balls_and_bins.h>
 #include <core/perspective_embedding.h>
-#include <limits>
 
 
 // utilities
@@ -227,12 +226,10 @@ IndexMat2D Embedding::chooseDimensionsToKeep(const IndexMat2D &lastIndices,
 Embedding::Embedding(const Mat2D &data_,
                      const unsigned int order,
                      const bool filterDims) :
+    EmbeddingData(order),
+
     K(data_.rows),
     N(data_.cols),
-
-    veronese(2 * order),
-    jacobian(2 * order),
-    hessian(2 * order),
 
     data(data_),
     logData(matLog(data_)),
@@ -249,10 +246,8 @@ Embedding::Embedding(const Mat2D &data_,
   if (filterDims) filterDimensions(indices.back(), order);
 }
 
-Embedding::Embedding(const EmbeddingInitializer &init, const int N_) :
-    K(Kconst),
-    N(N_),
-    hasNonPositiveVals(false) {  // true of false doesn't matter here
+EmbeddingData::EmbeddingData(const EmbeddingInitializer &init, const int N) {
+  const int K = Kconst;
   const int dims = static_cast<int>(init[0].size()) / N;
 
   Mat2D V = Mat2D(init[0]).reshape(0, dims);
@@ -289,15 +284,29 @@ Embedding::Embedding(const EmbeddingInitializer &init, const int N_) :
   hessian.push_back(H);
 }
 
-const Mat2D &Embedding::getV() const {
+EmbeddingData::EmbeddingData(const Mat2D &veronese_,
+                             const Mat3D &jacobian_,
+                             const Mat4D &hessian_) :
+    veronese(veronese_),
+    jacobian{jacobian_},
+    hessian{hessian_} {
+}
+
+EmbeddingData::EmbeddingData(const unsigned int order) :
+    veronese(2 * order),
+    jacobian(2 * order),
+    hessian(2 * order) {
+}
+
+const Mat2D &EmbeddingData::getV() const {
   return veronese.back();
 }
 
-const Mat3D &Embedding::getD() const {
+const Mat3D &EmbeddingData::getD() const {
   return jacobian.back();
 }
 
-const Mat4D &Embedding::getH() const {
+const Mat4D &EmbeddingData::getH() const {
   return hessian.back();
 }
 
@@ -310,7 +319,7 @@ Embedding perspective_embedding(const Mat2D &data,
   return Embedding(data, order, !all);
 }
 
-std::ostream &operator<<(std::ostream &os, Embedding const &e) {
+std::ostream &operator<<(std::ostream &os, EmbeddingData const &e) {
   os << e.getV() << std::endl << std::endl;
   os << e.getD() << std::endl;
   os << e.getH() << std::endl;

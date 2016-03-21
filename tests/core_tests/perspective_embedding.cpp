@@ -19,7 +19,7 @@ class PerspectiveEmbeddingTest : public
 // but this way it provides a more verbose way
 // of testing equality (dimension and data mismatches are reported separately,
 // besides mismatching values are shown)
-void checkEmbeddingEqual(const Embedding &a, const Embedding &b) {
+void checkEmbeddingEqual(const EmbeddingData &a, const EmbeddingData &b) {
   const auto V = a.getV();
   const auto D = a.getD();
   const auto H = a.getH();
@@ -61,7 +61,7 @@ TEST_P(PerspectiveEmbeddingTest, check1Motion) {
                             true).reshape(0, Kconst);
 
   checkEmbeddingEqual(perspective_embedding(input, O),
-                      Embedding(oneMotionExpected[hasZeros][Nidx], N));
+                      EmbeddingData(oneMotionExpected[hasZeros][Nidx], N));
 }
 
 TEST(PerspectiveEmbeddingTest, check2Motions) {
@@ -70,7 +70,7 @@ TEST(PerspectiveEmbeddingTest, check2Motions) {
   const Mat2D input = Mat2D(twoMotionsInput, true).reshape(0, Kconst);
 
   checkEmbeddingEqual(perspective_embedding(input, O),
-                      Embedding(twoMotionsExpected, N));
+                      EmbeddingData(twoMotionsExpected, N));
 }
 
 TEST(PerspectiveEmbeddingTest, checkDimensionValidation) {

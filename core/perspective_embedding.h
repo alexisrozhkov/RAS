@@ -7,15 +7,30 @@
 #include <ostream>
 #include <vector>
 
-
-class Embedding {
-  // input data dimensions
-  const int K, N;
-
-  // data that describes embedding
+class EmbeddingData {
+ protected:
   Mat2DArray veronese;
   Mat3DArray jacobian;
   Mat4DArray hessian;
+
+  EmbeddingData(const unsigned int order);
+
+ public:
+  EmbeddingData(const Mat2D &veronese,
+                const Mat3D &jacobian,
+                const Mat4D &hessian);
+
+  EmbeddingData(const EmbeddingInitializer &init,
+                const int N);
+
+  const Mat2D &getV() const;
+  const Mat3D &getD() const;
+  const Mat4D &getH() const;
+};
+
+class Embedding : public EmbeddingData {
+  // input data dimensions
+  const int K, N;
 
   // copy of data and it's element-wise logarithm
   const Mat2D data, logData;
@@ -64,16 +79,12 @@ class Embedding {
   void filterDimensions(const IndexMat2D &indicesLast, const int order);
 
  public:
-  Embedding(const Mat2D &data, const unsigned int order, const bool filterDims);
-
-  Embedding(const EmbeddingInitializer &init, const int N);
-
-  const Mat2D &getV() const;
-  const Mat3D &getD() const;
-  const Mat4D &getH() const;
+  Embedding(const Mat2D &data,
+            const unsigned int order,
+            const bool filterDims);
 };
 
-std::ostream &operator<<(std::ostream &os, Embedding const &e);
+std::ostream &operator<<(std::ostream &os, EmbeddingData const &e);
 
 const int Kconst = 5;
 
