@@ -438,8 +438,8 @@ void step6(const unsigned int groupCount,
   polynomialHessians = filterIdx3(polynomialHessians, sortedIndices);
 
   auto emb = perspective_embedding(jointImageData, 1, false);
-  auto embeddedData = emb.getV().back();
-  auto HembeddedData = emb.getH().back();
+  auto embeddedData = emb.getV();
+  auto HembeddedData = emb.getH();
 
   for (int angleIndex = 0; angleIndex < angleCount; angleIndex++) {
     labels = -1*IndexMat2D::ones(1, sampleCount);
@@ -554,9 +554,9 @@ EmbValT estimateOutliers(const RAS_params &params,
                          Mat2D &trimmedVeronese,
                          Mat3D &trimmedDerivative,
                          Mat4D &trimmedHessian) {
-  const auto untrimmedVeronese = embedding.getV().back();
-  const auto untrimmedDerivative = embedding.getD().back();
-  const auto untrimmedHessian = embedding.getH().back();
+  const auto untrimmedVeronese = embedding.getV();
+  const auto untrimmedDerivative = embedding.getD();
+  const auto untrimmedHessian = embedding.getH();
 
   const int untrimmedSampleCount = jointImageData.cols;
 

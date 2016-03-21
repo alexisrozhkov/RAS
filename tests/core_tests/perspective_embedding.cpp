@@ -20,13 +20,13 @@ class PerspectiveEmbeddingTest : public
 // of testing equality (dimension and data mismatches are reported separately,
 // besides mismatching values are shown)
 void checkEmbeddingEqual(const Embedding &a, const Embedding &b) {
-  const auto V = a.getV().back();
-  const auto D = a.getD().back();
-  const auto H = a.getH().back();
+  const auto V = a.getV();
+  const auto D = a.getD();
+  const auto H = a.getH();
 
-  const auto Ve = b.getV().back();
-  const auto De = b.getD().back();
-  const auto He = b.getH().back();
+  const auto Ve = b.getV();
+  const auto De = b.getD();
+  const auto He = b.getH();
 
   EXPECT_TRUE(isDblMatrixEqual(V, Ve));
 

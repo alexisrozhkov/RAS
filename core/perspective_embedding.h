@@ -68,9 +68,9 @@ class Embedding {
 
   Embedding(const EmbeddingInitializer &init, const int N);
 
-  const Mat2DArray &getV() const;
-  const Mat3DArray &getD() const;
-  const Mat4DArray &getH() const;
+  const Mat2D &getV() const;
+  const Mat3D &getD() const;
+  const Mat4D &getH() const;
 };
 
 std::ostream &operator<<(std::ostream &os, Embedding const &e);

@@ -289,16 +289,16 @@ Embedding::Embedding(const EmbeddingInitializer &init, const int N_) :
   hessian.push_back(H);
 }
 
-const Mat2DArray &Embedding::getV() const {
-  return veronese;
+const Mat2D &Embedding::getV() const {
+  return veronese.back();
 }
 
-const Mat3DArray &Embedding::getD() const {
-  return jacobian;
+const Mat3D &Embedding::getD() const {
+  return jacobian.back();
 }
 
-const Mat4DArray &Embedding::getH() const {
-  return hessian;
+const Mat4D &Embedding::getH() const {
+  return hessian.back();
 }
 
 
@@ -311,9 +311,9 @@ Embedding perspective_embedding(const Mat2D &data,
 }
 
 std::ostream &operator<<(std::ostream &os, Embedding const &e) {
-  os << e.getV().back() << std::endl << std::endl;
-  os << e.getD().back() << std::endl;
-  os << e.getH().back() << std::endl;
+  os << e.getV() << std::endl << std::endl;
+  os << e.getD() << std::endl;
+  os << e.getH() << std::endl;
 
   return os;
 }
