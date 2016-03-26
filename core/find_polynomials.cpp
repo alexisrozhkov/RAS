@@ -1,6 +1,6 @@
 // Copyright 2016 Alexey Rozhkov
 
-#include <core/utils/generalized_eigenvalues.h>
+#include <core/utils/arma_wrapper.h>
 #include <core/find_polynomials.h>
 #include <vector>
 
@@ -73,7 +73,7 @@ Mat2D find_polynomials(const Mat2D &data_,
                                                veroneseDimension);
 
     Mat2D alphas, betas;
-    generalizedEigenvals(A, B, &alphas, &betas);
+    generalizedSchur(A, B, &alphas, &betas);
 
     // find eigenvalues from ratios and sort
     // perhaps special care has to be taken for cases when beta ~ 0

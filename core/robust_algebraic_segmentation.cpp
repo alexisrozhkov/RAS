@@ -3,7 +3,7 @@
 #include <core/robust_algebraic_segmentation.h>
 #include <core/perspective_embedding.h>
 #include <core/utils/cholesky.h>
-#include <core/utils/arma_svd.h>
+#include <core/utils/arma_wrapper.h>
 #include <core/utils/subspace_angle.h>
 
 #include <vector>
@@ -185,8 +185,7 @@ Mat2D clusterQuadratic(const int clusterIdx,
   auto clusterData = filterIdx2(embeddedData, currIndices);
   auto clusterHessian = filterIdx4(HembeddedData, currIndices);
 
-  Mat2D U;
-  armaSVD_U(clusterData, &U);
+  Mat2D U = SVD_U(clusterData);
 
   Mat3D hpn = polyHessian(clusterSize,
                           U.col(U.cols - 1),
@@ -321,8 +320,7 @@ int ransacIter(const int sampleCount,
   // RANSAC an epipolar model
   Mat2D A = filterIdx2(kronImg1Img2, hypIndices).t();
 
-  Mat2D V;
-  armaSVD_V(A, &V);
+  Mat2D V = SVD_V(A);
 
   // Step 2: Compute a consensus among all group samples
   Mat2D Fstacked = V.col(V.cols-1).clone();
@@ -456,8 +454,7 @@ void step6(const unsigned int groupCount,
       for (int clusterIdx = 0; clusterIdx < clusterCount; clusterIdx++) {
         std::vector<int> indices{sampleIdx, clusterPrototype(clusterIdx)};
 
-        Mat2D U;
-        armaSVD_U(filterIdx2(polynomialNormals, indices), &U);
+        Mat2D U = SVD_U(filterIdx2(polynomialNormals, indices));
 
         Mat2D T = U.colRange(2, U.cols);
 
@@ -685,8 +682,7 @@ int checkDegenerateF(const Mat2D &img1,
       t3.copyTo(A(cv::Rect(0, sampleIndex * 3, t3.cols, t3.rows)));
     }
 
-    Mat2D V;
-    armaSVD_V(A, &V);
+    Mat2D V = SVD_V(A);
 
     // Step 2: Compute a consensus among all group samples
     Mat2D Hstacked = V.col(V.cols - 1).clone();

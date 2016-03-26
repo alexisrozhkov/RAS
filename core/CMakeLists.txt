@@ -8,11 +8,9 @@ add_library(RAS STATIC
             utils/ras_types.cpp
             utils/mat_nd.cpp
             utils/balls_and_bins.cpp
-            utils/generalized_eigenvalues.cpp
             utils/cholesky.cpp
             utils/subspace_angle.cpp
-            utils/jacobi_svd.cpp
-            utils/arma_svd.cpp
+            utils/arma_wrapper.cpp
             utils/ras_params.cpp
             perspective_embedding.cpp
             find_polynomials.cpp
