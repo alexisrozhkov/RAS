@@ -31,16 +31,15 @@ Mat2D throwOneOut(const Mat2D &input, const int idx) {
   }
 }
 
-Mat2D find_polynomials(const Mat2D &data_,
-                       const Mat3D &derivative,
+Mat2D find_polynomials(const EmbeddingData &embedding,
                        const FindPolyMethod method,
-                       const int charDimension,
                        const int ignoreSample) {
   if (method == FindPolyMethod::FISHER) {
     const EmbValT RAYLEIGHQUOTIENT_EPSILON = 10;
 
     // if ignoreSample == -1 returns data_ unmodified
-    Mat2D data = throwOneOut(data_, ignoreSample);
+    Mat2D data = throwOneOut(embedding.getV(), ignoreSample);
+    const Mat3D &derivative = embedding.getD();
 
     const int veroneseDimension = (uint) derivative.size(),
         dimensionCount = derivative[0].rows,
@@ -86,26 +85,14 @@ Mat2D find_polynomials(const Mat2D &data_,
     std::sort(eigenvals.begin(),  // NOLINT(build/include_what_you_use)
               eigenvals.end());
 
-    Mat2D out(veroneseDimension, charDimension);
-    for (int i = 0; i < charDimension; i++) {
-      // given an eigenval, we can easily find corresponding eigenvector
-      cv::SVD::solveZ(A - eigenvals[i] * B, out.col(i));
-
-      // no need to normalize since cv::SVD::solveZ seeks for solution
-      // with norm = 1
-    }
+    Mat2D out(veroneseDimension, 1);
+    cv::SVD::solveZ(A - eigenvals[0] * B, out);
 
     return out;
   } else {
     CV_Assert(ignoreSample == -1);  // ignoreSample is not currently handled
     Mat2D w, u, vt;
-    cv::SVD::compute(data_, w, u, vt, cv::SVD::FULL_UV);
-
-    Mat2D out(u.rows, charDimension);
-    for (int j = 0; j < charDimension; j++) {
-      u.col(u.cols - 1 - j).copyTo(out.col(charDimension - 1 - j));
-    }
-
-    return out;
+    cv::SVD::compute(embedding.getV(), w, u, vt, cv::SVD::FULL_UV);
+    return u.col(u.cols - 1);
   }
 }

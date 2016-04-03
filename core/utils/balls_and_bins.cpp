@@ -3,8 +3,8 @@
 #include <core/utils/balls_and_bins.h>
 
 
-IndexMat2DArray balls_and_bins(const unsigned int ballCount,
-                               const unsigned int binCount,
+IndexMat2DArray balls_and_bins(const size_t ballCount,
+                               const size_t binCount,
                                const bool all) {
   // Create a two dimensional cell array to hold solutions for smaller values
   // of both ballCount and binCount.

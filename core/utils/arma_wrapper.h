@@ -1,7 +1,7 @@
 // Copyright 2016 Alexey Rozhkov
 
-#ifndef CORE_UTILS_ARMA_SVD_H_
-#define CORE_UTILS_ARMA_SVD_H_
+#ifndef CORE_UTILS_ARMA_WRAPPER_H_
+#define CORE_UTILS_ARMA_WRAPPER_H_
 
 #include <core/utils/mat_nd.h>
 
@@ -15,4 +15,4 @@ void generalizedSchur(const Mat2D &A,
                       Mat2D *al,
                       Mat2D *be);
 
-#endif  // CORE_UTILS_ARMA_SVD_H_
+#endif  // CORE_UTILS_ARMA_WRAPPER_H_

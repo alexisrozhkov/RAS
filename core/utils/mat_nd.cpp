@@ -29,6 +29,30 @@ Mat4D Mat4D_zeros(const int A,
   return temp;
 }
 
+Mat2D Mat2D_clone(const Mat2D &from) {
+  return from.clone();
+}
+
+Mat3D Mat3D_clone(const Mat3D &from) {
+  Mat3D out(from.size());
+
+  for (size_t i = 0; i < out.size(); i++) {
+    out[i] = Mat2D_clone(from[i]);
+  }
+
+  return out;
+}
+
+Mat4D Mat4D_clone(const Mat4D &from) {
+  Mat4D out(from.size());
+
+  for (size_t i = 0; i < out.size(); i++) {
+    out[i] = Mat3D_clone(from[i]);
+  }
+
+  return out;
+}
+
 Mat2D filterIdx2(const Mat2D &src, const std::vector<int> &indices) {
   Mat2D out(src.rows, static_cast<int>(indices.size()));
 

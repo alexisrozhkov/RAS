@@ -1,6 +1,6 @@
 // Copyright 2016 Alexey Rozhkov
 
-#include <core/utils/cholesky.h>
+#include <core/utils/math.h>
 #include <algorithm>
 
 
@@ -35,4 +35,22 @@ Mat2D Cholesky(const Mat2D &A) {
   }
 
   return S;
+}
+
+Mat2D hat(const Mat2D &v) {
+  return (Mat2D(3, 3) <<     0, -v(2),  v(1),
+                          v(2),     0, -v(0),
+                         -v(1),  v(0),    0);
+}
+
+Mat2D kron(const Mat2D &a, const Mat2D &b) {
+  Mat2D out(a.rows*b.rows, a.cols*b.cols);
+
+  for (int j = 0; j < a.rows; j++) {
+    for (int i = 0; i < a.cols; i++) {
+      out(cv::Rect(i*b.cols, j*b.rows, b.cols, b.rows)) = a(j, i)*b;
+    }
+  }
+
+  return out;
 }

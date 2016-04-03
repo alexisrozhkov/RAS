@@ -20,6 +20,10 @@ typedef std::vector<Mat4D> Mat4DArray;
 Mat3D Mat3D_zeros(const int A, const int B, const int C);
 Mat4D Mat4D_zeros(const int A, const int B, const int C, const int D);
 
+Mat2D Mat2D_clone(const Mat2D &from);
+Mat3D Mat3D_clone(const Mat3D &from);
+Mat4D Mat4D_clone(const Mat4D &from);
+
 Mat2D filterIdx2(const Mat2D &src, const std::vector<int> &indices);
 Mat3D filterIdx3(const Mat3D &src, const std::vector<int> &indices);
 Mat4D filterIdx4(const Mat4D &src, const std::vector<int> &indices);

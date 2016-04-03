@@ -8,7 +8,7 @@ add_library(RAS STATIC
             utils/ras_types.cpp
             utils/mat_nd.cpp
             utils/balls_and_bins.cpp
-            utils/cholesky.cpp
+            utils/math.cpp
             utils/subspace_angle.cpp
             utils/arma_wrapper.cpp
             utils/ras_params.cpp
