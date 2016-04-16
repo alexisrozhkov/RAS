@@ -1,6 +1,8 @@
 // Copyright 2016 Alexey Rozhkov
 
 #include <core/utils/arma_wrapper.h>
+
+#define ARMA_DONT_USE_WRAPPER
 #include <armadillo>
 
 typedef arma::Col<EmbValT> AMat1D;
