@@ -137,6 +137,25 @@ std::vector<int> filterIndices(const InputType &in, UnaryPredicate pred) {
 
 // ras stuff
 
+struct ContractionSegmentation {
+  IndexMat2D inlierLabels;
+  IndexMat2D inlierAllLabels;
+  Mat3D quadratics;
+};
+
+struct Polynomial {
+  Mat2D coeffs;
+  Mat2D normals;
+};
+
+struct SegmentationInliers {
+  Mat2D jointData;
+  Polynomial polynomial;
+  EmbeddingData embedding;
+  std::vector<int> indices;
+  EmbValT outlierPercentage;
+};
+
 Mat3D polyHessian(const Mat2D &coeffs,
                   const Mat4D &hessian) {
   const int samplesCount = hessian[0][0].cols;
@@ -189,10 +208,9 @@ void mergeClusters(const unsigned int groupCount,
                    const bool NORMALIZE_QUADRATICS,
                    const Mat2D &jointImageData,
                    const EmbeddingData &emb,
-                   IndexMat2D *labelsP,
-                   Mat3D *quadraticsP) {
-  IndexMat2D &labels = *labelsP;
-  Mat3D &quadratics = *quadraticsP;
+                   ContractionSegmentation *segm) {
+  IndexMat2D &labels = segm->inlierLabels;
+  Mat3D &quadratics = segm->quadratics;
 
   int clusterCount = static_cast<int>(quadratics.size());
 
@@ -204,21 +222,24 @@ void mergeClusters(const unsigned int groupCount,
     }
 
     // find smallest cluster
-    int smallestClust = std::min_element(num.begin(), num.end()) - num.begin();
+    const int smallestClust = std::min_element(num.begin(),
+                                               num.end()) - num.begin();
+
+    const int lastCluster = clusterCount - 1;
 
     // swap last cluster with smallest
-    if (smallestClust != clusterCount-1) {
+    if (smallestClust != lastCluster) {
       for (int i = 0; i < labels.cols; i++) {
         // swap labels
         if (labels(i) == smallestClust) {
-          labels(i) = clusterCount-1;
-        } else if (labels(i) == clusterCount-1) {
+          labels(i) = lastCluster;
+        } else if (labels(i) == lastCluster) {
           labels(i) = smallestClust;
         }
       }
 
       // swap quadratics
-      std::swap(quadratics[smallestClust], quadratics[clusterCount-1]);
+      std::swap(quadratics[smallestClust], quadratics[lastCluster]);
     }
 
     std::vector<int> clusterChanged;
@@ -369,37 +390,19 @@ Mat3D recoverQuadratics(const int clusterCount,
   return quads;
 }
 
-typedef std::tuple<IndexMat2D, IndexMat2D> LabelsPair;
-
-struct Polynomial {
-  Mat2D coeffs;
-  Mat2D normals;
-};
-
-struct SegmentationInliers {
-  Mat2D jointData;
-  Polynomial polynomial;
-  EmbeddingData embedding;
-  std::vector<int> indices;
-  EmbValT outlierPercentage;
-};
-
-
-LabelsPair segmentContractions(const SegmentationInliers &inliers,
+ContractionSegmentation segmentContractions(const SegmentationInliers &inliers,
                                const unsigned int groupCount,
                                const RAS_params params) {
   // Step 6: Compute Tangent Spaces and Mutual Contractions. Use Mutual
   // Contractions as a similarity metric for spectral clustering. This
   // particular algorithm tries to oversegment the sample by using a
   // conservative tolerance.
-  LabelsPair out;
-  IndexMat2D &trimmedLabels = std::get<0>(out);
-  IndexMat2D &trimmedAllLabels = std::get<1>(out);
+  ContractionSegmentation out;
 
   const int sampleCount = inliers.jointData.cols;
   const int angleCount = static_cast<int>(params.angleTolerance.size());
 
-  trimmedAllLabels = -1*IndexMat2D::ones(angleCount, sampleCount);
+  out.inlierAllLabels = outlierIdx*IndexMat2D::ones(angleCount, sampleCount);
 
   Mat2D t1, t2, t3, t4;
   t1 = inliers.polynomial.coeffs.t() * inliers.embedding.getV();
@@ -431,10 +434,10 @@ LabelsPair segmentContractions(const SegmentationInliers &inliers,
   const EmbeddingData emb = perspective_embedding(sortedData, 1);
 
   for (int angleIndex = 0; angleIndex < angleCount; angleIndex++) {
-    trimmedLabels = -1*IndexMat2D::ones(1, sampleCount);
+    out.inlierLabels = outlierIdx*IndexMat2D::ones(1, sampleCount);
 
     int clusterCount = 0;
-    trimmedLabels(0) = 0;
+    out.inlierLabels(0) = 0;
 
     IndexMat2D clusterPrototype = IndexMat2D::zeros(1, sampleCount);
     clusterPrototype(0) = 0;
@@ -460,14 +463,14 @@ LabelsPair segmentContractions(const SegmentationInliers &inliers,
         Mat2D Cp = cv::abs(C1_ / norm(C1_) * C2_ / norm(C2_));
 
         if (Cp(0) >= cosTolerance) {
-          trimmedLabels(sampleIdx) = clusterIdx;
+          out.inlierLabels(sampleIdx) = clusterIdx;
           break;
         }
       }
 
-      if (trimmedLabels(sampleIdx) == -1) {
+      if (out.inlierLabels(sampleIdx) == outlierIdx) {
         clusterCount = clusterCount + 1;
-        trimmedLabels(sampleIdx) = clusterCount;
+        out.inlierLabels(sampleIdx) = clusterCount;
         clusterPrototype(clusterCount) = sampleIdx;
       }
     }
@@ -482,10 +485,10 @@ LabelsPair segmentContractions(const SegmentationInliers &inliers,
                          "Please choose a smaller angleTolerance");
     }
 
-    Mat3D quadratics = recoverQuadratics(clusterCount,
-                                         trimmedLabels,
-                                         emb,
-                                         params.NORMALIZE_QUADRATICS);
+    out.quadratics = recoverQuadratics(clusterCount,
+                                       out.inlierLabels,
+                                       emb,
+                                       params.NORMALIZE_QUADRATICS);
 
     ////////////////////////////////////////////////////////////////////////////
     // Step 8: Kill off smaller clusters one at a time, reassigning samples
@@ -495,15 +498,14 @@ LabelsPair segmentContractions(const SegmentationInliers &inliers,
                   params.NORMALIZE_QUADRATICS,
                   sortedData,
                   emb,
-                  &trimmedLabels,
-                  &quadratics);
+                  &out);
 
-    auto labelsCopy = trimmedLabels.clone();
+    auto labelsCopy = out.inlierLabels.clone();
     for (int i = 0; i < sampleCount; i++) {
-      trimmedLabels(sortedIndices[i]) = labelsCopy(i);
+      out.inlierLabels(sortedIndices[i]) = labelsCopy(i);
     }
 
-    trimmedLabels.copyTo(trimmedAllLabels.row(angleIndex));
+    out.inlierLabels.copyTo(out.inlierAllLabels.row(angleIndex));
   }
 
   if (params.angleTolerance.size() != 1) {
@@ -522,14 +524,14 @@ bool checkThreshold(const Polynomial &inlierPoly,
   EmbValT maxDistance = 0;
 
   for (int i = 0; i < inlierVeronese.cols; i++) {
-    Mat2D prod = inlierPoly.coeffs.t() * inlierVeronese.col(i);
-    EmbValT currDistance = fabs(prod(0)) / norm(inlierPoly.normals.col(i));
+    const Mat2D prod = inlierPoly.coeffs.t() * inlierVeronese.col(i);
+    const EmbValT currDist = fabs(prod(0)) / norm(inlierPoly.normals.col(i));
 
-    if (currDistance > maxDistance) {
-      maxDistance = currDistance;
+    if (currDist > maxDistance) {
+      maxDistance = currDist;
     }
 
-    if (currDistance > params.boundaryThreshold && params.DEBUG <= 1) {
+    if (currDist > params.boundaryThreshold && params.DEBUG <= 1) {
       break;
     }
   }
@@ -546,12 +548,12 @@ IndexedVec computeInfluence(const EmbeddingData &embedding,
 
   if (params.INFLUENCE_METHOD == InfluenceMethod::SAMPLE) {
     // polynomial.coeffs
-    Mat2D tempCoeffs = find_polynomials(embedding, params.FITTING_METHOD);
+    const Mat2D tempCoeffs = find_polynomials(embedding, params.FITTING_METHOD);
 
     // Reject outliers by the sample influence function
     for (int i = 0; i < sampleCount; i++) {
       // compute the leave-one-out influence
-      Mat2D U = find_polynomials(embedding, params.FITTING_METHOD, i);
+      const Mat2D U = find_polynomials(embedding, params.FITTING_METHOD, i);
 
       // polynomial.coeffs
       influence[i] = IndexedVal(subspace_angle(tempCoeffs, U), i);
@@ -579,6 +581,7 @@ SegmentationInliers estimateInliers(const Mat2D &jointImageData,
   // Step 3: Use influence function to perform robust pca
   const int sampleCount = jointImageData.cols;
 
+  // by default consider all points to be inliers
   int inlierSampleCount = sampleCount;
   inliers.embedding = emb;
 
@@ -591,16 +594,14 @@ SegmentationInliers estimateInliers(const Mat2D &jointImageData,
   }
 
   // REJECT_UNKNOWN_OUTLIERS
-  EmbValT outlierStep = (sampleCount < 100) ?
-                        round(1.0 / sampleCount * 100) / 100 : 0.01;
+  const EmbValT outlierStep = (sampleCount < 100) ?
+                              round(1.0 / sampleCount * 100) / 100 : 0.01;
 
-  int outlierIndex = 0;
   inliers.indices = std::vector<int>(influence.size());
 
   for (inliers.outlierPercentage = params.minOutlierPercentage;
        inliers.outlierPercentage <= params.maxOutlierPercentage;
        inliers.outlierPercentage += outlierStep) {
-    outlierIndex += 1;
     if (params.DEBUG > 0) {
       printf("Testing outlierPercentage %d",
              static_cast<int>(floor(100 * inliers.outlierPercentage)));
@@ -741,7 +742,7 @@ IndexMat2D postRansac(const Mat2D &img1,
 
   const int RANSACIteration = 10;
 
-  IndexMat2D currentLabels = -2 * IndexMat2D::ones(1, sampleCount);
+  IndexMat2D currentLabels = outlierIdx * IndexMat2D::ones(1, sampleCount);
 
   auto normedVector2 = img2.clone();
   for (int sampleIdx = 0; sampleIdx < sampleCount; sampleIdx++) {
@@ -822,7 +823,7 @@ IndexMat2D postRansac(const Mat2D &img1,
     // Finally assign labels and mode
     if (maxFConsensus == 0) {
       // All outliers
-      motionModels(grpIdx) = -1;
+      motionModels(grpIdx) = outlierIdx;
 
       for (int i = 0; i < labels.cols; i++) {
         if (labels(i) == grpIdx) {
@@ -864,19 +865,18 @@ IndexMat2D postRansac(const Mat2D &img1,
     // dont forget about changes made to bestF and bestH indexing
   }
 
-  std::cout << isGroupOutliers << std::endl;
-
   return currentLabels.clone();
 }
 
-// put inlier labels in the output according to the inlierIndices, set -1
-// label for the outliers
+// put inlier labels in the output according to the inlierIndices,
+// set outlierIdx label for the outliers
 IndexMat2D recomposeLabels(const int sampleCount,
                            const IndexMat2D &inlierLabels,
                            const std::vector<int> &inlierIndices,
                            const RAS_params &params) {
   if (params.REJECT_UNKNOWN_OUTLIERS || params.REJECT_KNOWN_OUTLIERS) {
-    IndexMat2D labels = -1*IndexMat2D::ones(inlierLabels.rows, sampleCount);
+    IndexMat2D labels = outlierIdx*IndexMat2D::ones(inlierLabels.rows,
+                                                    sampleCount);
 
     for (int i = 0; i < static_cast<int>(inlierIndices.size()); i++) {
       inlierLabels.col(i).copyTo(labels.col(inlierIndices[i]));
@@ -888,10 +888,10 @@ IndexMat2D recomposeLabels(const int sampleCount,
   }
 }
 
-Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
-                                    const Mat2D &img2Unnorm,
-                                    const unsigned int groupCount,
-                                    const RAS_params &params) {
+SegmentationResult robust_algebraic_segmentation(const Mat2D &img1Unnorm,
+                                                 const Mat2D &img2Unnorm,
+                                                 const unsigned int groupCount,
+                                                 const RAS_params &params) {
   //////////////////////////////////////////////////////////////////////////////
   // Step 1: map coordinates to joint image space.
   const Mat2D img1 = normalizeCoords(img1Unnorm, params.NORMALIZE_DATA);
@@ -907,22 +907,19 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
 
   //////////////////////////////////////////////////////////////////////////////
   // Steps 6-8
-  IndexMat2D inlierLabels, inlierAllLabels;
-
-  std::tie(inlierLabels, inlierAllLabels) = segmentContractions(inliers,
-                                                                groupCount,
-                                                                params);
+  const auto contrSegm = segmentContractions(inliers, groupCount, params);
 
   const int sampleCount = jointImageData.cols;
 
   IndexMat2D labels = recomposeLabels(sampleCount,
-                                      inlierLabels,
+                                      contrSegm.inlierLabels,
                                       inliers.indices,
                                       params),
-      allLabels = recomposeLabels(sampleCount,
-                                  inlierAllLabels,
-                                  inliers.indices,
-                                  params);
+
+          allLabels = recomposeLabels(sampleCount,
+                                      contrSegm.inlierAllLabels,
+                                      inliers.indices,
+                                      params);
 
   //////////////////////////////////////////////////////////////////////////////
   // Step 9: Post-refinement using RANSAC
@@ -931,12 +928,13 @@ Mat2D robust_algebraic_segmentation(const Mat2D &img1Unnorm,
 
   IndexMat2D motionModels = IndexMat2D::zeros(1, groupCount);
 
+  // todo: check what happens in reference code when POST_RANSAC is disabled
   if (params.POST_RANSAC) {
     labels = postRansac(img1, img2, params, labels, &motionModels);
   }
 
-  std::cout << labels+1 << std::endl;
-  std::cout << motionModels << std::endl;
-
-  return Mat2D();
+  return SegmentationResult{labels,
+                            motionModels,
+                            contrSegm.quadratics,
+                            allLabels};
 }

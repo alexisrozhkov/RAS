@@ -7,7 +7,8 @@ add_executable(runCoreTests
                utils/mat_equal_test.cpp
                balls_and_bins.cpp
                perspective_embedding.cpp
-               find_polynomials.cpp)
+               find_polynomials.cpp
+               robust_algebraic_segmentation.cpp)
 
 target_link_libraries(runCoreTests
                       gtest
